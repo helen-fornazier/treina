@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { db, getSettings, saveSettings } from '../db'
+import { getSettings, saveSettings } from '../db'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
 
 export default function SettingsPage() {
-  const navigate = useNavigate()
   const [userName, setUserName] = useState('')
   const [metricsFrom, setMetricsFrom] = useState<'allTime' | 'month' | 'year'>('allTime')
   const [saved, setSaved] = useState(false)

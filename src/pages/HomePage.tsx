@@ -1,13 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Settings, Calendar, ChevronDown, ChevronRight, Upload, Download, Dumbbell } from 'lucide-react'
+import { Plus, Settings, Calendar, ChevronDown, Upload } from 'lucide-react'
 import { useWorkouts, useSessions, useSettings } from '../hooks/useWorkouts'
-import { db } from '../db'
-import VideoThumbnail from '../components/ui/VideoThumbnail'
 import StatsBanner from '../components/workout/StatsBanner'
 import SuggestedWorkout from '../components/workout/SuggestedWorkout'
 import WorkoutListItem from '../components/workout/WorkoutListItem'
-import type { Workout } from '../types'
 
 export default function HomePage() {
   const navigate = useNavigate()

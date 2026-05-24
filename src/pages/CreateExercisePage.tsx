@@ -25,7 +25,7 @@ export default function CreateExercisePage() {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [audioDuration, setAudioDuration] = useState(0)
   const [audioPlaying, setAudioPlaying] = useState(false)
-  const [audioSpeed, setAudioSpeed] = useState<1 | 1.5 | 2>(1)
+  const audioSpeed = 1
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])

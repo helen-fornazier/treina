@@ -3,14 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   ChevronLeft, ChevronDown, ChevronRight, MoreVertical,
-  Play, Square, CheckCircle2, Circle, Timer, Copy, Pencil, Trash2, ToggleLeft, ToggleRight, Download
+  Play, CheckCircle2, Circle, Timer, Copy, Pencil, Trash2, ToggleLeft, ToggleRight, Download
 } from 'lucide-react'
 import { db } from '../db'
-import type { WorkoutExercise, Exercise } from '../types'
 import VideoThumbnail from '../components/ui/VideoThumbnail'
 import BottomSheet from '../components/ui/BottomSheet'
 import Button from '../components/ui/Button'
-import { v4 as uuid } from '../utils/uuid'
+import { uuid } from '../utils/uuid'
 
 export default function WorkoutDetailPage() {
   const { id } = useParams<{ id: string }>()

@@ -1,18 +1,15 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
 import { db } from '../db'
 import { uuid } from '../utils/uuid'
 import PageHeader from '../components/ui/PageHeader'
 import BottomSheet from '../components/ui/BottomSheet'
-import Button from '../components/ui/Button'
 
 const DAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
 export default function CalendarPage() {
-  const navigate = useNavigate()
   const today = new Date()
   const [month, setMonth] = useState(today.getMonth())
   const [year, setYear] = useState(today.getFullYear())

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { db } from '../db'
-import { uuid } from '../utils/uuid'
 import type { Workout, Exercise } from '../types'
 import Button from '../components/ui/Button'
 import { Download, AlertCircle } from 'lucide-react'

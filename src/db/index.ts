@@ -1,4 +1,4 @@
-import Dexie, { Table } from 'dexie'
+import Dexie, { type Table } from 'dexie'
 import type { Exercise, Workout, WorkoutSession, AppSettings, DayLog } from '../types'
 
 class TreinaDB extends Dexie {

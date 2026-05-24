@@ -14,10 +14,10 @@ export default function WorkoutListItem({ workout, sessions }: Props) {
   const navigate = useNavigate()
 
   const firstExerciseId = workout.exercises[0]?.exerciseId
-  const exercise = useLiveQuery(
-    () => firstExerciseId ? db.exercises.get(firstExerciseId) : Promise.resolve(undefined),
-    [firstExerciseId]
-  )
+  const exercise = useLiveQuery(async () => {
+    if (!firstExerciseId) return undefined
+    return db.exercises.get(firstExerciseId)
+  }, [firstExerciseId])
 
   const workoutSessions = sessions.filter(s => s.workoutId === workout.id && s.isComplete)
   const firstSession = workoutSessions[workoutSessions.length - 1]
