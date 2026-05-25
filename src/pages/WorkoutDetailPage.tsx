@@ -20,22 +20,31 @@ export default function WorkoutDetailPage() {
   const exercises = useLiveQuery(() => db.exercises.toArray(), [])
 
   const [checked, setChecked] = useState<Set<string>>(new Set())
-  const [sessionStarted, setSessionStarted] = useState(false)
-  const [startTime, setStartTime] = useState<Date | null>(null)
+  const [startTime] = useState(() => new Date())
   const [commentOpen, setCommentOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [finishOpen, setFinishOpen] = useState(false)
+  const [finishEndTime, setFinishEndTime] = useState<Date | null>(null)
   const [restTimer, setRestTimer] = useState<{ exerciseId: string; seconds: number; running: boolean } | null>(null)
   const [saved, setSaved] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const autoFinishRef = useRef(false)
 
-  useEffect(() => {
-    if (id && !sessionStarted) {
-      setSessionStarted(true)
-      setStartTime(new Date())
-    }
-  }, [id])
+  function playAlarm() {
+    if ('vibrate' in navigator) navigator.vibrate([200, 100, 200, 100, 400])
+    try {
+      const ctx = new AudioContext()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.frequency.value = 880
+      gain.gain.setValueAtTime(0.3, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 2)
+      osc.start()
+      osc.stop(ctx.currentTime + 2)
+    } catch { /* AudioContext may be unavailable */ }
+  }
 
   useEffect(() => {
     if (restTimer?.running) {
@@ -60,26 +69,9 @@ export default function WorkoutDetailPage() {
     if (!allChecked) { autoFinishRef.current = false; return }
     if (autoFinishRef.current) return
     autoFinishRef.current = true
-    const end = new Date()
-    const start = startTime ?? end
+    setFinishEndTime(new Date())
     setFinishOpen(true)
-  }, [checked, workout, startTime])
-
-  function playAlarm() {
-    if ('vibrate' in navigator) navigator.vibrate([200, 100, 200, 100, 400])
-    try {
-      const ctx = new AudioContext()
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      osc.frequency.value = 880
-      gain.gain.setValueAtTime(0.3, ctx.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 2)
-      osc.start()
-      osc.stop(ctx.currentTime + 2)
-    } catch { /* AudioContext may be unavailable */ }
-  }
+  }, [checked, workout])
 
   function toggleCheck(exId: string) {
     setChecked(prev => {
@@ -110,6 +102,11 @@ export default function WorkoutDetailPage() {
       isComplete,
     })
     setSaved(true)
+  }
+
+  function openFinishSheet() {
+    setFinishEndTime(new Date())
+    setFinishOpen(true)
   }
 
   async function handleFinish(editedStart: Date, editedEnd: Date) {
@@ -336,7 +333,7 @@ export default function WorkoutDetailPage() {
             variant={allDone ? 'primary' : 'secondary'}
             fullWidth
             size="lg"
-            onClick={() => setFinishOpen(true)}
+            onClick={openFinishSheet}
           >
             {allDone ? 'Finalizar Treino ✓' : `Finalizar — ${done.length}/${workout.exercises.length}`}
           </Button>
@@ -392,7 +389,8 @@ export default function WorkoutDetailPage() {
       <FinishSheet
         open={finishOpen}
         onClose={() => setFinishOpen(false)}
-        startTime={startTime ?? new Date()}
+        startTime={startTime}
+        endTime={finishEndTime ?? new Date()}
         onConfirm={handleFinish}
       />
     </div>
@@ -403,11 +401,12 @@ interface FinishSheetProps {
   open: boolean
   onClose: () => void
   startTime: Date
+  endTime: Date
   onConfirm: (start: Date, end: Date) => void
 }
 
-function FinishSheet({ open, onClose, startTime, onConfirm }: FinishSheetProps) {
-  const durationMin = Math.max(1, Math.round((Date.now() - startTime.getTime()) / 60000))
+function FinishSheet({ open, onClose, startTime, endTime, onConfirm }: FinishSheetProps) {
+  const durationMin = Math.max(1, Math.round((endTime.getTime() - startTime.getTime()) / 60000))
 
   return (
     <BottomSheet open={open} onClose={onClose} title="Finalizar treino">
@@ -416,7 +415,7 @@ function FinishSheet({ open, onClose, startTime, onConfirm }: FinishSheetProps) 
           <p className="text-[#888888] text-sm mb-1">Duração</p>
           <p className="text-5xl font-bold text-[#4BDF93] tabular-nums">{durationMin}<span className="text-2xl font-normal ml-1">min</span></p>
         </div>
-        <Button fullWidth size="lg" onClick={() => onConfirm(startTime, new Date())}>
+        <Button fullWidth size="lg" onClick={() => onConfirm(startTime, endTime)}>
           Salvar treino
         </Button>
       </div>

@@ -1,4 +1,3 @@
-import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronRight, Zap } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -6,6 +5,7 @@ import { db } from '../../db'
 import type { Workout } from '../../types'
 import VideoThumbnail from '../ui/VideoThumbnail'
 import WorkoutContextMenu from './WorkoutContextMenu'
+import { useLongPress } from '../../hooks/useLongPress'
 
 interface Props {
   workout: Workout
@@ -13,9 +13,7 @@ interface Props {
 
 export default function SuggestedWorkout({ workout }: Props) {
   const navigate = useNavigate()
-  const [menuOpen, setMenuOpen] = useState(false)
-  const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const didLongPress = useRef(false)
+  const { active: menuOpen, close: closeMenu, didFire: didLongPress, onPointerDown: handlePointerDown, cancel: cancelLongPress } = useLongPress()
 
   const firstExerciseId = workout.exercises[0]?.exerciseId
   const exercise = useLiveQuery(async () => {
@@ -24,22 +22,6 @@ export default function SuggestedWorkout({ workout }: Props) {
   }, [firstExerciseId])
 
   const thumbnail = exercise?.video?.thumbnail
-
-  function handlePointerDown() {
-    didLongPress.current = false
-    longPressRef.current = setTimeout(() => {
-      didLongPress.current = true
-      if ('vibrate' in navigator) navigator.vibrate(30)
-      setMenuOpen(true)
-    }, 500)
-  }
-
-  function cancelLongPress() {
-    if (longPressRef.current) {
-      clearTimeout(longPressRef.current)
-      longPressRef.current = null
-    }
-  }
 
   function handleClick() {
     if (didLongPress.current) return
@@ -73,7 +55,7 @@ export default function SuggestedWorkout({ workout }: Props) {
         <ChevronRight size={18} className="text-[#888888] flex-shrink-0" />
       </button>
 
-      <WorkoutContextMenu workout={workout} open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <WorkoutContextMenu workout={workout} open={menuOpen} onClose={closeMenu} />
     </section>
   )
 }

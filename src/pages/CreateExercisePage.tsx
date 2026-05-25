@@ -37,6 +37,7 @@ export default function CreateExercisePage() {
 
   useEffect(() => {
     if (existing) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setName(existing.name)
       setComment(existing.comment ?? '')
       setVariants(existing.variants)

@@ -1,4 +1,3 @@
-import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronRight, Lock } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -6,6 +5,7 @@ import { db } from '../../db'
 import type { Workout, WorkoutSession } from '../../types'
 import VideoThumbnail from '../ui/VideoThumbnail'
 import WorkoutContextMenu from './WorkoutContextMenu'
+import { useLongPress } from '../../hooks/useLongPress'
 
 interface Props {
   workout: Workout
@@ -14,9 +14,7 @@ interface Props {
 
 export default function WorkoutListItem({ workout, sessions }: Props) {
   const navigate = useNavigate()
-  const [menuOpen, setMenuOpen] = useState(false)
-  const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const didLongPress = useRef(false)
+  const { active: menuOpen, close: closeMenu, didFire: didLongPress, onPointerDown: handlePointerDown, cancel: cancelLongPress } = useLongPress()
 
   const firstExerciseId = workout.exercises[0]?.exerciseId
   const exercise = useLiveQuery(async () => {
@@ -32,22 +30,6 @@ export default function WorkoutListItem({ workout, sessions }: Props) {
   const lastDate = lastSession
     ? new Date(lastSession.startedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
     : new Date(workout.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
-
-  function handlePointerDown() {
-    didLongPress.current = false
-    longPressRef.current = setTimeout(() => {
-      didLongPress.current = true
-      if ('vibrate' in navigator) navigator.vibrate(30)
-      setMenuOpen(true)
-    }, 500)
-  }
-
-  function cancelLongPress() {
-    if (longPressRef.current) {
-      clearTimeout(longPressRef.current)
-      longPressRef.current = null
-    }
-  }
 
   function handleClick() {
     if (didLongPress.current) return
@@ -83,7 +65,7 @@ export default function WorkoutListItem({ workout, sessions }: Props) {
         <ChevronRight size={16} className="text-[#888888] flex-shrink-0" />
       </button>
 
-      <WorkoutContextMenu workout={workout} open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <WorkoutContextMenu workout={workout} open={menuOpen} onClose={closeMenu} />
     </>
   )
 }

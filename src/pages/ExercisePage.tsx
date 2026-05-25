@@ -17,6 +17,7 @@ interface Option {
 function useBlobUrl(blob: Blob | undefined): string | undefined {
   const [url, setUrl] = useState<string | undefined>(undefined)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!blob) { setUrl(undefined); return }
     const u = URL.createObjectURL(blob)
     setUrl(u)

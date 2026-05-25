@@ -10,7 +10,7 @@ import Button from '../components/ui/Button'
 import BottomSheet from '../components/ui/BottomSheet'
 import VideoThumbnail from '../components/ui/VideoThumbnail'
 import {
-  DndContext, closestCenter, PointerSensor, useSensor, useSensors,
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent,
 } from '@dnd-kit/core'
 import {
   SortableContext, useSortable, verticalListSortingStrategy, arrayMove,
@@ -36,7 +36,7 @@ export default function CreateWorkoutPage() {
   const didRestoreRef = useRef(false)
 
   useEffect(() => {
-    getSettings().then(s => { if (!author) setAuthor(s.userName) })
+    getSettings().then(s => setAuthor(s.userName))
   }, [])
 
   // On mount: restore draft + auto-add newly created exercise (returning from CreateExercisePage)
@@ -50,6 +50,7 @@ export default function CreateWorkoutPage() {
     if (!rawDraft) return
     try {
       const draft = JSON.parse(rawDraft) as { name: string; author: string; comment: string; exercises: WorkoutExercise[] }
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setName(draft.name)
       setComment(draft.comment)
       const base = draft.exercises
@@ -66,6 +67,7 @@ export default function CreateWorkoutPage() {
 
   useEffect(() => {
     if (existingWorkout) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setName(existingWorkout.name)
       setAuthor(existingWorkout.author)
       setComment(existingWorkout.comment ?? '')
@@ -83,7 +85,7 @@ export default function CreateWorkoutPage() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
-  function handleDragEnd(event: any) {
+  function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     if (!over || active.id === over.id) return
     const oldIdx = exercises.findIndex(e => e.id === active.id)

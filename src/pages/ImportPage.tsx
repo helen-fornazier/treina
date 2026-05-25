@@ -50,6 +50,7 @@ export default function ImportPage() {
       }
     }
     reader.readAsText(file)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function deserializeExercise(ex: SerializedExercise): Promise<Exercise> {
