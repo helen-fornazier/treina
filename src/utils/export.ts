@@ -42,11 +42,17 @@ export async function exportWorkouts(workouts: Workout[]): Promise<void> {
     : `treinos_${new Date().toISOString().slice(0, 10)}.treino`
 
   if (navigator.share) {
-    try {
-      const shareFile = new File([blob], filename, { type: 'application/octet-stream' })
-      await navigator.share({ files: [shareFile], title: filename })
-      return
-    } catch { /* user cancelled or share unavailable — fall through to download */ }
+    // Use text/plain — Chrome's Web Share API allowlist rejects application/octet-stream
+    const shareFile = new File([blob], filename, { type: 'text/plain' })
+    if (navigator.canShare?.({ files: [shareFile] }) !== false) {
+      try {
+        await navigator.share({ files: [shareFile], title: filename })
+        return
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'AbortError') return
+        // Other errors: fall through to download
+      }
+    }
   }
 
   const url = URL.createObjectURL(blob)
