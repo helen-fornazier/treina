@@ -1,15 +1,32 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { db } from '../db'
-import type { Workout, Exercise } from '../types'
+import type { Workout, Exercise, ExerciseVariant } from '../types'
 import Button from '../components/ui/Button'
 import { Download, AlertCircle } from 'lucide-react'
+
+interface SerializedVideo {
+  data?: string
+  thumbnail: string
+  duration: number
+  isHD: boolean
+}
+
+interface SerializedVariant extends Omit<ExerciseVariant, 'video'> {
+  video?: SerializedVideo
+}
+
+interface SerializedExercise extends Omit<Exercise, 'video' | 'audio' | 'variants'> {
+  video?: SerializedVideo
+  audio?: { data?: string; duration: number }
+  variants: SerializedVariant[]
+}
 
 interface TreinoFile {
   version: number
   exported_at: string
   workouts: Workout[]
-  exercise_library: Exercise[]
+  exercise_library: SerializedExercise[]
 }
 
 export default function ImportPage() {
@@ -35,6 +52,28 @@ export default function ImportPage() {
     reader.readAsText(file)
   }, [])
 
+  async function deserializeExercise(ex: SerializedExercise): Promise<Exercise> {
+    const result: Exercise = { ...ex, video: undefined, audio: undefined, variants: [] }
+    if (ex.video?.data) {
+      const blob = await fetch(ex.video.data).then(r => r.blob())
+      result.video = { blob, thumbnail: ex.video.thumbnail, duration: ex.video.duration, isHD: ex.video.isHD }
+    } else {
+      result.video = undefined
+    }
+    if (ex.audio?.data) {
+      const blob = await fetch(ex.audio.data).then(r => r.blob())
+      result.audio = { blob, duration: ex.audio.duration }
+    } else {
+      result.audio = undefined
+    }
+    result.variants = await Promise.all(ex.variants.map(async v => {
+      if (!v.video?.data) return { ...v, video: undefined } as ExerciseVariant
+      const blob = await fetch(v.video.data).then(r => r.blob())
+      return { ...v, video: { blob, thumbnail: v.video.thumbnail, duration: v.video.duration, isHD: v.video.isHD } } as ExerciseVariant
+    }))
+    return result
+  }
+
   async function handleImport() {
     if (!data) return
     setImporting(true)
@@ -43,7 +82,8 @@ export default function ImportPage() {
     for (const ex of data.exercise_library ?? []) {
       const exists = await db.exercises.get(ex.id)
       if (!exists) {
-        await db.exercises.add({ ...ex, readonly: true, importedFrom: data.workouts[0]?.id })
+        const deserialized = await deserializeExercise(ex)
+        await db.exercises.add({ ...deserialized, readonly: true, importedFrom: data.workouts[0]?.id })
       }
     }
 
@@ -57,7 +97,7 @@ export default function ImportPage() {
           ...w,
           readonly: true,
           importedAt: Date.now(),
-          isActive: false,
+          isActive: true,
           order: workoutCount + i,
         })
       }
@@ -76,7 +116,7 @@ export default function ImportPage() {
         <div className="text-center">
           <p className="text-lg font-semibold text-[#F0F0F0]">Treinos importados!</p>
           <p className="text-sm text-[#888888] mt-1">
-            {data?.workouts.length} treino(s) adicionado(s) como inativos.
+            {data?.workouts.length} treino(s) adicionado(s) como ativos.
           </p>
         </div>
         <Button fullWidth size="lg" onClick={() => navigate('/')}>Ver meus treinos</Button>
@@ -131,7 +171,7 @@ export default function ImportPage() {
         </p>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto px-4 pb-6 pt-3 bg-[#111111] border-t border-[#2A2A2A] flex flex-col gap-2">
+      <div className="fixed bottom-0 left-0 right-0 px-4 pb-6 pt-3 bg-[#111111] border-t border-[#2A2A2A] flex flex-col gap-2">
         <Button fullWidth size="lg" onClick={handleImport} disabled={importing}>
           {importing ? 'Importando...' : 'Importar treinos'}
         </Button>

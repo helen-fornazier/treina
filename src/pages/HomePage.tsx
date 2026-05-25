@@ -1,10 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Settings, Calendar, ChevronDown, Upload } from 'lucide-react'
+import { Plus, Settings, Calendar, ChevronDown, Upload, Download } from 'lucide-react'
 import { useWorkouts, useSessions, useSettings } from '../hooks/useWorkouts'
+import { exportWorkouts } from '../utils/export'
+import type { Workout } from '../types'
 import StatsBanner from '../components/workout/StatsBanner'
 import SuggestedWorkout from '../components/workout/SuggestedWorkout'
 import WorkoutListItem from '../components/workout/WorkoutListItem'
+import BottomSheet from '../components/ui/BottomSheet'
+import Button from '../components/ui/Button'
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -14,11 +18,13 @@ export default function HomePage() {
 
   const [activeCollapsed, setActiveCollapsed] = useState(false)
   const [inactiveCollapsed, setInactiveCollapsed] = useState(true)
+  const [exportSheet, setExportSheet] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [exporting, setExporting] = useState(false)
 
   const active = workouts.filter(w => w.isActive).sort((a, b) => a.order - b.order)
   const inactive = workouts.filter(w => !w.isActive).sort((a, b) => a.order - b.order)
 
-  // Suggested workout: next in active list after last session's workout
   const suggestedWorkout = (() => {
     if (active.length === 0) return null
     if (sessions.length === 0) return active[0]
@@ -34,6 +40,42 @@ export default function HomePage() {
     navigate('/import', { state: { file } })
   }
 
+  function openExportSheet() {
+    setSelected(new Set())
+    setExportSheet(true)
+  }
+
+  function toggleSelect(id: string) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAll() {
+    if (selected.size === workouts.length) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(workouts.map(w => w.id)))
+    }
+  }
+
+  async function handleExport() {
+    const toExport = workouts.filter(w => selected.has(w.id)) as Workout[]
+    if (toExport.length === 0) return
+    setExporting(true)
+    try {
+      await exportWorkouts(toExport)
+      setExportSheet(false)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const allSelected = workouts.length > 0 && selected.size === workouts.length
+
   return (
     <div className="flex flex-col min-h-svh bg-[#111111] pb-24">
       {/* Top Bar */}
@@ -45,10 +87,10 @@ export default function HomePage() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => navigate('/calendar')} className="p-2 text-[#888888]">
+          <button type="button" onClick={() => navigate('/calendar')} className="p-2 text-[#888888]">
             <Calendar size={22} />
           </button>
-          <button onClick={() => navigate('/settings')} className="p-2 text-[#888888]">
+          <button type="button" onClick={() => navigate('/settings')} className="p-2 text-[#888888]">
             <Settings size={22} />
           </button>
         </div>
@@ -66,6 +108,7 @@ export default function HomePage() {
         {/* Active Workouts */}
         <section>
           <button
+            type="button"
             className="flex items-center justify-between w-full mb-3"
             onClick={() => setActiveCollapsed(v => !v)}
           >
@@ -101,6 +144,7 @@ export default function HomePage() {
         {inactive.length > 0 && (
           <section>
             <button
+              type="button"
               className="flex items-center justify-between w-full mb-3"
               onClick={() => setInactiveCollapsed(v => !v)}
             >
@@ -127,11 +171,11 @@ export default function HomePage() {
           </section>
         )}
 
-        {/* Import */}
-        <div className="flex items-center gap-3">
+        {/* Import / Export */}
+        <div className="flex items-center gap-4">
           <label className="flex items-center gap-2 text-sm text-[#888888] cursor-pointer">
             <Upload size={16} />
-            <span>Importar treinos</span>
+            <span>Importar</span>
             <input
               type="file"
               accept=".treino,application/x-treino"
@@ -139,16 +183,83 @@ export default function HomePage() {
               onChange={handleImport}
             />
           </label>
+          {workouts.length > 0 && (
+            <button
+              type="button"
+              onClick={openExportSheet}
+              className="flex items-center gap-2 text-sm text-[#888888]"
+            >
+              <Download size={16} />
+              <span>Exportar</span>
+            </button>
+          )}
         </div>
       </div>
 
       {/* FAB — New Workout */}
       <button
+        type="button"
         onClick={() => navigate('/workout/new')}
         className="fixed bottom-6 right-4 w-14 h-14 rounded-full bg-[#FF0D5F] shadow-lg flex items-center justify-center active:opacity-80 transition-opacity z-20"
       >
         <Plus size={28} className="text-white" />
       </button>
+
+      {/* Export sheet */}
+      <BottomSheet open={exportSheet} onClose={() => setExportSheet(false)} title="Exportar treinos">
+        <div className="flex flex-col">
+          {/* Select all toggle */}
+          <button
+            type="button"
+            onClick={toggleAll}
+            className="flex items-center justify-between px-4 py-3 border-b border-[#2A2A2A] w-full"
+          >
+            <span className="text-sm text-[#888888]">Selecionar todos</span>
+            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${allSelected ? 'bg-[#4BDF93] border-[#4BDF93]' : 'border-[#444444]'}`}>
+              {allSelected && <span className="text-[#111111] text-xs font-bold">✓</span>}
+            </div>
+          </button>
+
+          {/* Workout list */}
+          <div className="overflow-y-auto" style={{ maxHeight: '40svh' }}>
+            {workouts.map(w => {
+              const isSelected = selected.has(w.id)
+              return (
+                <button
+                  type="button"
+                  key={w.id}
+                  onClick={() => toggleSelect(w.id)}
+                  className="flex items-center gap-3 px-4 py-3 w-full border-b border-[#2A2A2A] last:border-0"
+                >
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className="text-sm text-[#F0F0F0] truncate">{w.name}</p>
+                    <p className="text-xs text-[#888888]">{w.exercises.length} exercício(s)</p>
+                  </div>
+                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? 'bg-[#4BDF93] border-[#4BDF93]' : 'border-[#444444]'}`}>
+                    {isSelected && <span className="text-[#111111] text-xs font-bold">✓</span>}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Export button */}
+          <div className="px-4 pt-3 pb-4">
+            <Button
+              fullWidth
+              size="lg"
+              onClick={handleExport}
+              disabled={selected.size === 0 || exporting}
+            >
+              {exporting
+                ? 'Exportando...'
+                : selected.size === 0
+                  ? 'Selecione treinos'
+                  : `Exportar ${selected.size} treino${selected.size > 1 ? 's' : ''}`}
+            </Button>
+          </div>
+        </div>
+      </BottomSheet>
     </div>
   )
 }

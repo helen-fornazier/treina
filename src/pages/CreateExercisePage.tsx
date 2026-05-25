@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Plus, Trash2, Mic, Square, Play, Pause } from 'lucide-react'
 import { db } from '../db'
@@ -11,6 +11,7 @@ import VideoThumbnail from '../components/ui/VideoThumbnail'
 
 export default function CreateExercisePage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { id } = useParams<{ id: string }>()
   const isEdit = !!id
 
@@ -25,12 +26,14 @@ export default function CreateExercisePage() {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [audioDuration, setAudioDuration] = useState(0)
   const [audioPlaying, setAudioPlaying] = useState(false)
+  const [audioError, setAudioError] = useState('')
   const audioSpeed = 1
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const recordingStartRef = useRef<number>(0)
+  const variantsEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (existing) {
@@ -50,7 +53,7 @@ export default function CreateExercisePage() {
     await new Promise(res => { video.onloadedmetadata = res })
 
     if (video.duration > 60) {
-      alert('O vídeo deve ter no máximo 1 minuto. Selecione um vídeo mais curto ou use a opção HD.')
+      alert('O vídeo deve ter no máximo 1 minuto.')
       return
     }
 
@@ -73,21 +76,34 @@ export default function CreateExercisePage() {
   }
 
   async function startRecording() {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-    const mr = new MediaRecorder(stream)
-    mediaRecorderRef.current = mr
-    audioChunksRef.current = []
-    recordingStartRef.current = Date.now()
-
-    mr.ondataavailable = e => audioChunksRef.current.push(e.data)
-    mr.onstop = () => {
-      const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-      setAudioBlob(blob)
-      setAudioDuration(Math.round((Date.now() - recordingStartRef.current) / 1000))
-      stream.getTracks().forEach(t => t.stop())
+    setAudioError('')
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setAudioError('Gravação não disponível. Acesse via localhost ou HTTPS.')
+      return
     }
-    mr.start()
-    setRecording(true)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mr = new MediaRecorder(stream)
+      mediaRecorderRef.current = mr
+      audioChunksRef.current = []
+      recordingStartRef.current = Date.now()
+
+      mr.ondataavailable = e => audioChunksRef.current.push(e.data)
+      mr.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        setAudioBlob(blob)
+        setAudioDuration(Math.round((Date.now() - recordingStartRef.current) / 1000))
+        stream.getTracks().forEach(t => t.stop())
+      }
+      mr.start()
+      setRecording(true)
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'NotAllowedError') {
+        setAudioError('Permissão de microfone negada. Verifique as configurações do navegador.')
+      } else {
+        setAudioError('Não foi possível iniciar a gravação. Acesse via localhost ou HTTPS.')
+      }
+    }
   }
 
   function stopRecording() {
@@ -112,6 +128,9 @@ export default function CreateExercisePage() {
 
   function addVariant() {
     setVariants(prev => [...prev, { id: uuid(), name: '', comment: '' }])
+    requestAnimationFrame(() => {
+      variantsEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    })
   }
 
   function updateVariant(id: string, patch: Partial<ExerciseVariant>) {
@@ -153,7 +172,12 @@ export default function CreateExercisePage() {
     if (isEdit && id) {
       await db.exercises.update(id, payload)
     } else {
-      await db.exercises.add({ ...payload, id: uuid() })
+      const newId = uuid()
+      await db.exercises.add({ ...payload, id: newId })
+      // If opened from CreateWorkoutPage, signal the new exercise ID
+      if ((location.state as { fromWorkout?: boolean } | null)?.fromWorkout) {
+        sessionStorage.setItem('wk_new_ex', newId)
+      }
     }
     navigate(-1)
   }
@@ -178,17 +202,11 @@ export default function CreateExercisePage() {
           <label className="text-xs text-[#888888] mb-2 block">Vídeo (máx. 1 minuto)</label>
           <div className="flex items-center gap-3">
             <VideoThumbnail thumbnail={thumbnail} size="md" />
-            <div className="flex flex-col gap-2">
-              <label className="flex items-center gap-2 text-sm text-[#4BDF93] cursor-pointer">
-                <Plus size={14} />
-                {thumbnail ? 'Trocar vídeo' : 'Adicionar vídeo'}
-                <input type="file" accept="video/*" className="hidden" onChange={handleVideoChange} />
-              </label>
-              <label className="flex items-center gap-2 text-xs text-[#888888] cursor-pointer">
-                <input type="file" accept="video/*" className="hidden" onChange={handleVideoChange} />
-                HD (sem compressão)
-              </label>
-            </div>
+            <label className="flex items-center gap-2 text-sm text-[#4BDF93] cursor-pointer">
+              <Plus size={14} />
+              {thumbnail ? 'Trocar vídeo' : 'Adicionar vídeo'}
+              <input type="file" accept="video/*" className="hidden" onChange={handleVideoChange} />
+            </label>
           </div>
         </div>
 
@@ -225,6 +243,9 @@ export default function CreateExercisePage() {
               </div>
             )}
           </div>
+          {audioError && (
+            <p className="mt-2 text-xs text-[#FF0D5F]">{audioError}</p>
+          )}
           <audio ref={audioRef} onEnded={() => setAudioPlaying(false)} className="hidden" />
         </div>
 
@@ -302,10 +323,11 @@ export default function CreateExercisePage() {
               </div>
             ))}
           </div>
+          <div ref={variantsEndRef} />
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto px-4 pb-6 pt-3 bg-[#111111] border-t border-[#2A2A2A] z-10">
+      <div className="fixed bottom-0 left-0 right-0 px-4 pb-6 pt-3 bg-[#111111] border-t border-[#2A2A2A] z-10">
         <Button fullWidth size="lg" onClick={handleSave} disabled={!name.trim()}>
           {isEdit ? 'Salvar' : 'Criar exercício'}
         </Button>

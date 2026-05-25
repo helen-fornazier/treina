@@ -3,7 +3,11 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+const isGitHubPages = process.env.GITHUB_PAGES === 'true'
+const base = isGitHubPages ? '/treina/' : '/'
+
 export default defineConfig({
+  base,
   plugins: [
     react(),
     tailwindcss(),
@@ -18,19 +22,20 @@ export default defineConfig({
         background_color: '#111111',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/',
+        start_url: base,
         icons: [
           { src: 'pwa-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'pwa-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
         ],
         file_handlers: [
           {
-            action: '/import',
+            action: `${base}import`,
             accept: { 'application/x-treino': ['.treino'] },
           },
         ],
       },
       workbox: {
+        navigateFallback: `${base}index.html`,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
           {
@@ -39,6 +44,9 @@ export default defineConfig({
             options: { cacheName: 'external-cache' },
           },
         ],
+      },
+      devOptions: {
+        enabled: true,
       },
     }),
   ],

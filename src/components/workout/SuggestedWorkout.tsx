@@ -1,9 +1,11 @@
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronRight, Zap } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../db'
 import type { Workout } from '../../types'
 import VideoThumbnail from '../ui/VideoThumbnail'
+import WorkoutContextMenu from './WorkoutContextMenu'
 
 interface Props {
   workout: Workout
@@ -11,6 +13,9 @@ interface Props {
 
 export default function SuggestedWorkout({ workout }: Props) {
   const navigate = useNavigate()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const didLongPress = useRef(false)
 
   const firstExerciseId = workout.exercises[0]?.exerciseId
   const exercise = useLiveQuery(async () => {
@@ -19,6 +24,27 @@ export default function SuggestedWorkout({ workout }: Props) {
   }, [firstExerciseId])
 
   const thumbnail = exercise?.video?.thumbnail
+
+  function handlePointerDown() {
+    didLongPress.current = false
+    longPressRef.current = setTimeout(() => {
+      didLongPress.current = true
+      if ('vibrate' in navigator) navigator.vibrate(30)
+      setMenuOpen(true)
+    }, 500)
+  }
+
+  function cancelLongPress() {
+    if (longPressRef.current) {
+      clearTimeout(longPressRef.current)
+      longPressRef.current = null
+    }
+  }
+
+  function handleClick() {
+    if (didLongPress.current) return
+    navigate(`/workout/${workout.id}`)
+  }
 
   return (
     <section>
@@ -29,8 +55,12 @@ export default function SuggestedWorkout({ workout }: Props) {
         </span>
       </div>
       <button
-        onClick={() => navigate(`/workout/${workout.id}`)}
-        className="w-full bg-[#1C1C1C] rounded-2xl p-4 border border-[#2A2A2A] flex items-center gap-4 active:opacity-80 transition-opacity text-left"
+        onClick={handleClick}
+        onPointerDown={handlePointerDown}
+        onPointerUp={cancelLongPress}
+        onPointerLeave={cancelLongPress}
+        onContextMenu={e => e.preventDefault()}
+        className="w-full bg-[#1C1C1C] rounded-2xl p-4 border border-[#2A2A2A] flex items-center gap-4 active:opacity-80 transition-opacity text-left select-none"
       >
         <VideoThumbnail thumbnail={thumbnail} size="md" />
         <div className="flex-1 min-w-0">
@@ -42,6 +72,8 @@ export default function SuggestedWorkout({ workout }: Props) {
         </div>
         <ChevronRight size={18} className="text-[#888888] flex-shrink-0" />
       </button>
+
+      <WorkoutContextMenu workout={workout} open={menuOpen} onClose={() => setMenuOpen(false)} />
     </section>
   )
 }

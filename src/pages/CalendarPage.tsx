@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Trash2, Plus } from 'lucide-react'
 import { db } from '../db'
 import { uuid } from '../utils/uuid'
 import PageHeader from '../components/ui/PageHeader'
@@ -18,13 +18,24 @@ export default function CalendarPage() {
 
   const sessions = useLiveQuery(() => db.sessions.toArray(), [])
   const workouts = useLiveQuery(() => db.workouts.toArray(), [])
+  const activeWorkouts = (workouts ?? []).filter(w => w.isActive)
+
+  const completedSessions = (sessions ?? []).filter(s => s.isComplete)
 
   const trainedDays = new Set(
-    (sessions ?? []).filter(s => s.isComplete).map(s => {
+    completedSessions.map(s => {
       const d = new Date(s.startedAt)
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     })
   )
+
+  const daySessions = selectedDay
+    ? completedSessions.filter(s => {
+        const d = new Date(s.startedAt)
+        const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+        return k === selectedDay
+      })
+    : []
 
   function daysInMonth(m: number, y: number) { return new Date(y, m + 1, 0).getDate() }
   function firstDayOfMonth(m: number, y: number) { return new Date(y, m, 1).getDay() }
@@ -46,6 +57,11 @@ export default function CalendarPage() {
     return `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
   }
 
+  function formatSelectedDay(key: string) {
+    const [, m, d] = key.split('-').map(Number)
+    return `${d} de ${MONTHS[m - 1]}`
+  }
+
   async function logWorkout(workoutId: string) {
     if (!selectedDay) return
     const [y, m, d] = selectedDay.split('-').map(Number)
@@ -60,7 +76,10 @@ export default function CalendarPage() {
       completedExerciseIds: [],
       isComplete: true,
     })
-    setLogSheet(false)
+  }
+
+  async function removeSession(sessionId: string) {
+    await db.sessions.delete(sessionId)
   }
 
   return (
@@ -69,13 +88,13 @@ export default function CalendarPage() {
 
       {/* Month nav */}
       <div className="flex items-center justify-between px-4 mb-4">
-        <button onClick={prevMonth} className="p-2 text-[#888888]">
+        <button type="button" onClick={prevMonth} className="p-2 text-[#888888]">
           <ChevronLeft size={20} />
         </button>
         <span className="text-sm font-semibold text-[#F0F0F0]">
           {MONTHS[month]} {year}
         </span>
-        <button onClick={nextMonth} className="p-2 text-[#888888]">
+        <button type="button" onClick={nextMonth} className="p-2 text-[#888888]">
           <ChevronRight size={20} />
         </button>
       </div>
@@ -93,11 +112,12 @@ export default function CalendarPage() {
           if (!day) return <div key={i} />
           const key = dayKey(day)
           const trained = trainedDays.has(key)
-          const isToday = key === dayKey(today.getDate()) && month === today.getMonth() && year === today.getFullYear()
+          const isToday = key === `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
           const isSelected = selectedDay === key
 
           return (
             <button
+              type="button"
               key={i}
               onClick={() => { setSelectedDay(key); setLogSheet(true) }}
               className={`
@@ -114,11 +134,46 @@ export default function CalendarPage() {
         })}
       </div>
 
-      {/* Log workout sheet */}
-      <BottomSheet open={logSheet} onClose={() => setLogSheet(false)} title={`Registrar treino — ${selectedDay}`}>
+      {/* Day detail sheet */}
+      <BottomSheet
+        open={logSheet}
+        onClose={() => setLogSheet(false)}
+        title={selectedDay ? formatSelectedDay(selectedDay) : ''}
+      >
         <div className="pb-4">
-          {workouts?.map(w => (
+          {/* Existing sessions for this day */}
+          {daySessions.length > 0 && (
+            <>
+              <p className="px-4 pt-3 pb-1 text-xs text-[#888888] uppercase tracking-wider">Treinos registrados</p>
+              {daySessions.map(session => {
+                const workout = workouts?.find(w => w.id === session.workoutId)
+                return (
+                  <div key={session.id} className="flex items-center gap-3 px-4 py-3 border-b border-[#2A2A2A]">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-[#F0F0F0] truncate">{workout?.name ?? 'Treino removido'}</p>
+                      <p className="text-xs text-[#888888]">{session.duration} min</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeSession(session.id)}
+                      className="p-2 text-[#FF0D5F] flex-shrink-0"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                )
+              })}
+              <p className="px-4 pt-4 pb-1 text-xs text-[#888888] uppercase tracking-wider flex items-center gap-1">
+                <Plus size={12} />
+                Adicionar outro
+              </p>
+            </>
+          )}
+
+          {/* Workout list to log */}
+          {activeWorkouts.map(w => (
             <button
+              type="button"
               key={w.id}
               onClick={() => logWorkout(w.id)}
               className="flex items-center gap-3 px-4 py-3 w-full border-b border-[#2A2A2A] last:border-0"

@@ -1,13 +1,29 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ChevronLeft, Play, Pause, ChevronDown, RefreshCw } from 'lucide-react'
+import { ChevronLeft, Play, Pause, ChevronDown, Check } from 'lucide-react'
 import { db } from '../db'
-import type { ExerciseVariant } from '../types'
-import Button from '../components/ui/Button'
-import BottomSheet from '../components/ui/BottomSheet'
+import type { ExerciseVideo } from '../types'
 
 const SPEEDS = [1, 1.5, 2] as const
+
+interface Option {
+  id: string | undefined  // undefined = main exercise
+  name: string
+  video: ExerciseVideo | undefined
+  comment: string | undefined
+}
+
+function useBlobUrl(blob: Blob | undefined): string | undefined {
+  const [url, setUrl] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    if (!blob) { setUrl(undefined); return }
+    const u = URL.createObjectURL(blob)
+    setUrl(u)
+    return () => URL.revokeObjectURL(u)
+  }, [blob])
+  return url
+}
 
 export default function ExercisePage() {
   const { id: workoutId, exerciseId: workoutExerciseId } = useParams<{ id: string; exerciseId: string }>()
@@ -22,17 +38,25 @@ export default function ExercisePage() {
 
   const [audioSpeed, setAudioSpeed] = useState<1 | 1.5 | 2>(1)
   const [audioPlaying, setAudioPlaying] = useState(false)
-  const [commentOpen, setCommentOpen] = useState(true)
+  const [commentOpen, setCommentOpen] = useState(false)
   const [alternativesOpen, setAlternativesOpen] = useState(false)
-  const [swapSheet, setSwapSheet] = useState(false)
   const [notes, setNotes] = useState(workoutExercise?.userNotes ?? '')
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const videoRef = useRef<HTMLVideoElement | null>(null)
 
-  const selectedVariant = workoutExercise?.selectedVariantId
-    ? exercise?.variants.find(v => v.id === workoutExercise.selectedVariantId)
-    : null
-  const activeVideo = selectedVariant?.video ?? exercise?.video
+  const options = useMemo<Option[]>(() => {
+    if (!exercise) return []
+    return [
+      { id: undefined, name: exercise.name, video: exercise.video, comment: exercise.comment },
+      ...exercise.variants.map(v => ({ id: v.id, name: v.name, video: v.video, comment: v.comment })),
+    ]
+  }, [exercise])
+
+  const selectedId = workoutExercise?.selectedVariantId
+  const activeOption = options.find(o => o.id === selectedId) ?? options[0]
+
+  // Stable blob URLs — only recreated when the actual blob changes
+  const videoSrc = useBlobUrl(activeOption?.video?.blob)
+  const audioSrc = useBlobUrl(exercise?.audio?.blob)
 
   function toggleAudio() {
     if (!audioRef.current) return
@@ -60,45 +84,52 @@ export default function ExercisePage() {
     await db.workouts.update(workout.id, { exercises: updated })
   }
 
-  async function swapVariant(variantId: string | undefined) {
+  async function selectOption(optionId: string | undefined) {
     if (!workout || !workoutExerciseId) return
     const updated = workout.exercises.map(e =>
-      e.id === workoutExerciseId ? { ...e, selectedVariantId: variantId } : e
+      e.id === workoutExerciseId ? { ...e, selectedVariantId: optionId } : e
     )
     await db.workouts.update(workout.id, { exercises: updated })
-    setSwapSheet(false)
   }
 
-  if (!exercise) return null
+  if (!exercise) return (
+    <div className="flex flex-col min-h-svh bg-[#111111] items-center justify-center">
+      <div className="w-8 h-8 border-2 border-[#4BDF93] border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+
+  const activeComment = workoutExercise?.comment ?? activeOption?.comment
 
   return (
     <div className="flex flex-col min-h-svh bg-[#111111] pb-24">
       {/* Header */}
       <header className="flex items-center gap-3 px-4 pt-12 pb-3 sticky top-0 z-10 bg-[#111111]">
-        <button onClick={() => navigate(-1)} className="text-[#4BDF93] p-1 -ml-1">
+        <button type="button" onClick={() => navigate(-1)} className="text-[#4BDF93] p-1 -ml-1">
           <ChevronLeft size={24} />
         </button>
         <h1 className="flex-1 text-lg font-semibold text-[#F0F0F0] truncate">
-          {exercise.name}
-          {selectedVariant && <span className="text-[#888888] font-normal"> · {selectedVariant.name}</span>}
+          {activeOption?.name ?? exercise.name}
         </h1>
       </header>
 
-      {/* Video */}
-      <div className="w-full aspect-video bg-[#000] relative">
-        {activeVideo?.blob ? (
+      {/* Video — max 50% viewport height, stable src */}
+      <div className="w-full bg-[#000] flex items-center justify-center" style={{ maxHeight: '50svh' }}>
+        {videoSrc ? (
           <video
-            ref={videoRef}
-            src={URL.createObjectURL(activeVideo.blob)}
+            src={videoSrc}
             autoPlay
             loop
             playsInline
             muted
-            className="w-full h-full object-contain"
+            className="w-full object-contain"
+            style={{ maxHeight: '50svh' }}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-[#888888]">
-            <Play size={48} />
+          <div className="w-full flex items-center justify-center text-[#555555]" style={{ height: '30svh' }}>
+            <div className="flex flex-col items-center gap-2">
+              <Play size={40} />
+              <span className="text-xs">Sem vídeo</span>
+            </div>
           </div>
         )}
       </div>
@@ -126,6 +157,7 @@ export default function ExercisePage() {
         {exercise.audio && (
           <div className="bg-[#1C1C1C] rounded-2xl p-4 border border-[#2A2A2A] flex items-center gap-3">
             <button
+              type="button"
               onClick={toggleAudio}
               className="w-10 h-10 rounded-full bg-[#252525] flex items-center justify-center flex-shrink-0"
             >
@@ -136,18 +168,22 @@ export default function ExercisePage() {
               <div className="h-1 bg-[#252525] rounded-full mt-1.5 w-full" />
             </div>
             <button
+              type="button"
               onClick={cycleSpeed}
               className="text-xs text-[#888888] border border-[#2A2A2A] rounded-lg px-2 py-1 font-mono"
             >
               {audioSpeed}x
             </button>
+            <audio ref={audioRef} src={audioSrc} onEnded={() => setAudioPlaying(false)} className="hidden" />
           </div>
         )}
 
         {/* Professor comment */}
-        {(exercise.comment || workoutExercise?.comment) && (
+        {activeComment && (
           <div className="bg-[#1C1C1C] rounded-2xl border border-[#2A2A2A] overflow-hidden">
             <button
+              type="button"
+              onPointerDown={e => e.preventDefault()}
               onClick={() => setCommentOpen(v => !v)}
               className="flex items-center gap-2 px-4 py-3 w-full text-sm text-[#888888]"
             >
@@ -155,9 +191,7 @@ export default function ExercisePage() {
               Comentário do professor
             </button>
             {commentOpen && (
-              <p className="px-4 pb-4 text-sm text-[#F0F0F0]">
-                {workoutExercise?.comment ?? exercise.comment}
-              </p>
+              <p className="px-4 pb-4 text-sm text-[#F0F0F0]">{activeComment}</p>
             )}
           </div>
         )}
@@ -175,24 +209,26 @@ export default function ExercisePage() {
           />
         </div>
 
-        {/* Alternatives */}
-        {exercise.variants.length > 0 && (
+        {/* Alternatives (includes main) */}
+        {options.length > 1 && (
           <div className="bg-[#1C1C1C] rounded-2xl border border-[#2A2A2A] overflow-hidden">
             <button
+              type="button"
+              onPointerDown={e => e.preventDefault()}
               onClick={() => setAlternativesOpen(v => !v)}
               className="flex items-center gap-2 px-4 py-3 w-full text-sm text-[#888888]"
             >
               <ChevronDown size={14} className={`transition-transform ${alternativesOpen ? '' : '-rotate-90'}`} />
-              Exercícios alternativos ({exercise.variants.length})
+              Exercícios ({options.length})
             </button>
             {alternativesOpen && (
               <div className="px-4 pb-4 flex flex-col gap-2">
-                {exercise.variants.map(v => (
-                  <AlternativeItem
-                    key={v.id}
-                    variant={v}
-                    isSelected={workoutExercise?.selectedVariantId === v.id}
-                    onSwap={() => setSwapSheet(true)}
+                {options.map(opt => (
+                  <OptionItem
+                    key={opt.id ?? 'main'}
+                    option={opt}
+                    isActive={opt.id === selectedId || (opt.id === undefined && selectedId === undefined)}
+                    onSelect={() => selectOption(opt.id)}
                   />
                 ))}
               </div>
@@ -200,54 +236,35 @@ export default function ExercisePage() {
           </div>
         )}
       </div>
-
-      {/* Swap confirmation sheet */}
-      <BottomSheet open={swapSheet} onClose={() => setSwapSheet(false)} title="Trocar exercício">
-        <div className="px-4 py-4 flex flex-col gap-3">
-          <p className="text-sm text-[#888888]">
-            Trocar temporariamente para este exercício nesta sessão?
-          </p>
-          {exercise.variants.map(v => (
-            <button
-              key={v.id}
-              onClick={() => swapVariant(v.id)}
-              className="flex items-center gap-3 bg-[#252525] rounded-xl p-3 text-left"
-            >
-              {v.video?.thumbnail && (
-                <img src={v.video.thumbnail} className="w-14 h-14 rounded-lg object-cover" />
-              )}
-              <span className="text-sm text-[#F0F0F0]">{v.name}</span>
-            </button>
-          ))}
-          {workoutExercise?.selectedVariantId && (
-            <Button variant="ghost" fullWidth onClick={() => swapVariant(undefined)}>
-              Voltar ao exercício principal
-            </Button>
-          )}
-        </div>
-      </BottomSheet>
     </div>
   )
 }
 
-function AlternativeItem({ variant, isSelected, onSwap }: { variant: ExerciseVariant; isSelected: boolean; onSwap: () => void }) {
+function OptionItem({ option, isActive, onSelect }: { option: Option; isActive: boolean; onSelect: () => void }) {
   return (
-    <div className="flex items-center gap-3 bg-[#252525] rounded-xl p-3">
-      {variant.video?.thumbnail && (
-        <img src={variant.video.thumbnail} className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+    <div className={`flex items-center gap-3 rounded-xl p-3 border ${isActive ? 'bg-[#4BDF93]/10 border-[#4BDF93]/30' : 'bg-[#252525] border-transparent'}`}>
+      {option.video?.thumbnail ? (
+        <img src={option.video.thumbnail} className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+      ) : (
+        <div className="w-14 h-14 rounded-lg bg-[#333333] flex items-center justify-center flex-shrink-0">
+          <Play size={18} className="text-[#555555]" />
+        </div>
       )}
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-[#F0F0F0] truncate">{variant.name}</p>
-        {variant.comment && <p className="text-xs text-[#888888]">{variant.comment}</p>}
-        {isSelected && <span className="text-xs text-[#4BDF93]">Em uso</span>}
+        <p className="text-sm text-[#F0F0F0] truncate">{option.name}</p>
+        {option.comment && <p className="text-xs text-[#888888] line-clamp-1">{option.comment}</p>}
+        {isActive && <span className="text-xs text-[#4BDF93] font-medium">Em uso</span>}
       </div>
-      <button
-        onClick={onSwap}
-        className="flex items-center gap-1 text-xs text-[#FF0D5F] border border-[#FF0D5F]/30 rounded-lg px-2 py-1"
-      >
-        <RefreshCw size={11} />
-        Trocar
-      </button>
+      {!isActive && (
+        <button
+          type="button"
+          onClick={onSelect}
+          className="flex items-center gap-1 text-xs text-[#4BDF93] border border-[#4BDF93]/30 rounded-lg px-2 py-1 flex-shrink-0"
+        >
+          <Check size={11} />
+          Usar
+        </button>
+      )}
     </div>
   )
 }

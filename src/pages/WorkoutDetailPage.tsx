@@ -3,9 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   ChevronLeft, ChevronDown, ChevronRight, MoreVertical,
-  Play, CheckCircle2, Circle, Timer, Copy, Pencil, Trash2, ToggleLeft, ToggleRight, Download
+  Play, Pause, Check, RotateCcw, Timer, Copy, Pencil, Trash2, ToggleLeft, ToggleRight, Download
 } from 'lucide-react'
 import { db } from '../db'
+import { exportWorkouts } from '../utils/export'
 import VideoThumbnail from '../components/ui/VideoThumbnail'
 import BottomSheet from '../components/ui/BottomSheet'
 import Button from '../components/ui/Button'
@@ -25,7 +26,9 @@ export default function WorkoutDetailPage() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [finishOpen, setFinishOpen] = useState(false)
   const [restTimer, setRestTimer] = useState<{ exerciseId: string; seconds: number; running: boolean } | null>(null)
+  const [saved, setSaved] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const autoFinishRef = useRef(false)
 
   useEffect(() => {
     if (id && !sessionStarted) {
@@ -51,17 +54,31 @@ export default function WorkoutDetailPage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [restTimer?.running])
 
+  useEffect(() => {
+    if (!workout || workout.exercises.length === 0) return
+    const allChecked = workout.exercises.every(e => checked.has(e.id))
+    if (!allChecked) { autoFinishRef.current = false; return }
+    if (autoFinishRef.current) return
+    autoFinishRef.current = true
+    const end = new Date()
+    const start = startTime ?? end
+    setFinishOpen(true)
+  }, [checked, workout, startTime])
+
   function playAlarm() {
-    const ctx = new AudioContext()
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.connect(gain)
-    gain.connect(ctx.destination)
-    osc.frequency.value = 880
-    gain.gain.setValueAtTime(0.3, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 2)
-    osc.start()
-    osc.stop(ctx.currentTime + 2)
+    if ('vibrate' in navigator) navigator.vibrate([200, 100, 200, 100, 400])
+    try {
+      const ctx = new AudioContext()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.frequency.value = 880
+      gain.gain.setValueAtTime(0.3, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 2)
+      osc.start()
+      osc.stop(ctx.currentTime + 2)
+    } catch { /* AudioContext may be unavailable */ }
   }
 
   function toggleCheck(exId: string) {
@@ -78,22 +95,25 @@ export default function WorkoutDetailPage() {
     setRestTimer({ exerciseId, seconds, running: true })
   }
 
-  async function handleFinish(editedStart: Date, editedEnd: Date) {
-    const duration = Math.round((editedEnd.getTime() - editedStart.getTime()) / 60000)
+  async function saveSession(start: Date, end: Date) {
+    const duration = Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000))
     const allIds = workout?.exercises.map(e => e.id) ?? []
     const completedIds = allIds.filter(id => checked.has(id))
     const isComplete = completedIds.length === allIds.length
-
     await db.sessions.add({
       id: uuid(),
       workoutId: workout!.id,
-      startedAt: editedStart.getTime(),
-      finishedAt: editedEnd.getTime(),
+      startedAt: start.getTime(),
+      finishedAt: end.getTime(),
       duration,
       completedExerciseIds: completedIds,
       isComplete,
     })
+    setSaved(true)
+  }
 
+  async function handleFinish(editedStart: Date, editedEnd: Date) {
+    await saveSession(editedStart, editedEnd)
     navigate('/')
   }
 
@@ -125,6 +145,12 @@ export default function WorkoutDetailPage() {
     navigate(`/workout/${cloned.id}/edit`)
   }
 
+  async function handleExport() {
+    if (!workout) return
+    setMenuOpen(false)
+    await exportWorkouts([workout])
+  }
+
   if (!workout) return null
 
   const pending = workout.exercises.filter(e => !checked.has(e.id))
@@ -144,7 +170,9 @@ export default function WorkoutDetailPage() {
         </button>
         <div className="flex-1 min-w-0">
           <h1 className="text-lg font-semibold text-[#F0F0F0] truncate">{workout.name}</h1>
-          <p className="text-xs text-[#888888]">{workout.author}</p>
+          <p className="text-xs text-[#888888]">
+            {done.length}/{workout.exercises.length} exercícios{workout.author ? ` · ${workout.author}` : ''}
+          </p>
         </div>
         <button onClick={() => setMenuOpen(true)} className="p-2 text-[#888888]">
           <MoreVertical size={20} />
@@ -181,71 +209,83 @@ export default function WorkoutDetailPage() {
           const isTimerActive = restTimer?.exerciseId === we.id
 
           return (
-            <div key={we.id} className="bg-[#1C1C1C] rounded-2xl border border-[#2A2A2A] overflow-hidden">
+            <div key={we.id} className="bg-[#1C1C1C] rounded-2xl border border-[#2A2A2A] overflow-hidden flex items-stretch">
+              {/* Checkbox — left side, vertically centered */}
               <button
-                onClick={() => navigate(`/workout/${id}/exercise/${we.id}`)}
-                className="flex items-center gap-3 p-3 w-full text-left active:opacity-80"
+                onClick={() => toggleCheck(we.id)}
+                className="flex items-center justify-center px-3 flex-shrink-0 self-stretch"
               >
-                <VideoThumbnail thumbnail={thumbnail} size="sm" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-[#F0F0F0] truncate">
-                    {ex?.name ?? 'Exercício'}
-                  </p>
-                  {we.reps && <p className="text-xs text-[#888888]">{we.reps}</p>}
-                  {we.restSeconds && (
-                    <p className="text-xs text-[#888888]">Descanso: {we.restSeconds}s</p>
-                  )}
-                </div>
-                <ChevronRight size={16} className="text-[#888888] flex-shrink-0" />
+                <div className="w-6 h-6 rounded border-2 border-[#444444]" />
               </button>
 
-              {/* Rest timer */}
-              {we.restSeconds && (
-                <div className="flex items-center gap-3 px-3 pb-3">
-                  {isTimerActive && restTimer ? (
-                    <div className="flex items-center gap-3 w-full">
-                      <div className="w-8 h-8 rounded-full border-2 border-[#4BDF93] flex items-center justify-center">
-                        <Timer size={14} className="text-[#4BDF93]" />
-                      </div>
-                      <span className="text-lg font-bold text-[#4BDF93] tabular-nums">
-                        {String(Math.floor(restTimer.seconds / 60)).padStart(2, '0')}:
-                        {String(restTimer.seconds % 60).padStart(2, '0')}
-                      </span>
-                      {!restTimer.running && restTimer.seconds > 0 && (
-                        <button
-                          onClick={() => setRestTimer(r => r ? { ...r, running: true } : null)}
-                          className="ml-auto text-xs text-[#4BDF93]"
-                        >
-                          Retomar
-                        </button>
-                      )}
-                    </div>
-                  ) : (
+              {/* Right content */}
+              <div className="flex-1 min-w-0 border-l border-[#2A2A2A]">
+                <button
+                  onClick={() => navigate(`/workout/${id}/exercise/${we.id}`)}
+                  className="flex items-center gap-3 p-3 w-full text-left active:opacity-80"
+                >
+                  <VideoThumbnail thumbnail={thumbnail} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[#F0F0F0] truncate">
+                      {ex?.name ?? 'Exercício'}
+                    </p>
+                    {we.reps && <p className="text-xs text-[#888888]">{we.reps}</p>}
+                  </div>
+                  <ChevronRight size={16} className="text-[#888888] flex-shrink-0" />
+                </button>
+
+                {/* Rest timer — always visible */}
+                {we.restSeconds && (
+                  <div className="flex items-center gap-2 px-3 pb-3">
                     <button
-                      onClick={() => startRestTimer(we.id, we.restSeconds!)}
-                      className="flex items-center gap-2 text-xs text-[#888888] border border-[#2A2A2A] rounded-lg px-3 py-1.5"
+                      onClick={() => {
+                        if (!isTimerActive) {
+                          startRestTimer(we.id, we.restSeconds!)
+                        } else if (restTimer && restTimer.seconds > 0) {
+                          setRestTimer(r => r ? { ...r, running: !r.running } : null)
+                        } else {
+                          setRestTimer(null)
+                        }
+                      }}
+                      className={`flex-1 flex items-center gap-2 text-xs rounded-lg px-3 py-2 border transition-colors ${
+                        isTimerActive && restTimer && (restTimer.running || restTimer.seconds === 0)
+                          ? 'border-[#4BDF93]/30 text-[#4BDF93]'
+                          : 'border-[#2A2A2A] text-[#888888]'
+                      }`}
                     >
-                      <Play size={12} />
-                      Descanso {we.restSeconds}s
+                      {!isTimerActive
+                        ? <Timer size={13} />
+                        : restTimer?.running
+                          ? <Pause size={13} />
+                          : restTimer?.seconds === 0
+                            ? <Check size={13} />
+                            : <Play size={13} />}
+                      <span className="font-mono font-bold text-sm tabular-nums">
+                        {isTimerActive && restTimer
+                          ? `${String(Math.floor(restTimer.seconds / 60)).padStart(2, '0')}:${String(restTimer.seconds % 60).padStart(2, '0')}`
+                          : `${String(Math.floor(we.restSeconds / 60)).padStart(2, '0')}:${String(we.restSeconds % 60).padStart(2, '0')}`}
+                      </span>
+                      <span className="text-xs">
+                        {!isTimerActive
+                          ? 'descanso'
+                          : restTimer?.running
+                            ? 'pausar'
+                            : restTimer?.seconds === 0
+                              ? 'feito!'
+                              : 'retomar'}
+                      </span>
                     </button>
-                  )}
-
-                  <button
-                    onClick={() => toggleCheck(we.id)}
-                    className="ml-auto"
-                  >
-                    <Circle size={24} className="text-[#888888]" />
-                  </button>
-                </div>
-              )}
-
-              {!we.restSeconds && (
-                <div className="flex justify-end px-3 pb-3">
-                  <button onClick={() => toggleCheck(we.id)}>
-                    <Circle size={24} className="text-[#888888]" />
-                  </button>
-                </div>
-              )}
+                    {isTimerActive && (
+                      <button
+                        onClick={() => setRestTimer(null)}
+                        className="p-2 text-[#888888] border border-[#2A2A2A] rounded-lg flex-shrink-0"
+                      >
+                        <RotateCcw size={14} />
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )
         })}
@@ -258,15 +298,19 @@ export default function WorkoutDetailPage() {
               const ex = getExercise(we.exerciseId)
               const thumbnail = ex?.video?.thumbnail
               return (
-                <div key={we.id} className="flex items-center gap-3 p-3 bg-[#1C1C1C]/50 rounded-2xl border border-[#2A2A2A] mb-2 opacity-50">
-                  <VideoThumbnail thumbnail={thumbnail} size="sm" className="grayscale" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#888888] truncate">{ex?.name}</p>
-                    {we.reps && <p className="text-xs text-[#888888]">{we.reps}</p>}
-                  </div>
-                  <button onClick={() => toggleCheck(we.id)}>
-                    <CheckCircle2 size={24} className="text-[#4BDF93]" />
+                <div key={we.id} className="bg-[#1C1C1C]/50 rounded-2xl border border-[#2A2A2A] mb-2 opacity-50 flex items-stretch overflow-hidden">
+                  <button onClick={() => toggleCheck(we.id)} className="flex items-center justify-center px-3 flex-shrink-0 self-stretch">
+                    <div className="w-6 h-6 rounded bg-[#4BDF93] flex items-center justify-center">
+                      <span className="text-[#111111] text-xs font-bold leading-none">✓</span>
+                    </div>
                   </button>
+                  <div className="flex items-center gap-3 p-3 flex-1 min-w-0 border-l border-[#2A2A2A]">
+                    <VideoThumbnail thumbnail={thumbnail} size="sm" className="grayscale" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#888888] truncate">{ex?.name}</p>
+                      {we.reps && <p className="text-xs text-[#888888]">{we.reps}</p>}
+                    </div>
+                  </div>
                 </div>
               )
             })}
@@ -277,23 +321,26 @@ export default function WorkoutDetailPage() {
         {allDone && (
           <div className="bg-[#4BDF93]/10 border border-[#4BDF93]/30 rounded-2xl p-4 text-center mt-2">
             <p className="text-[#4BDF93] font-semibold text-base">Treino concluído! 🎉</p>
-            <p className="text-xs text-[#888888] mt-1">
-              Iniciado às {startTime?.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-            </p>
           </div>
         )}
       </div>
 
       {/* Bottom actions */}
-      <div className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto px-4 pb-6 pt-3 bg-[#111111] border-t border-[#2A2A2A] z-10">
-        <Button
-          variant={allDone ? 'primary' : 'secondary'}
-          fullWidth
-          size="lg"
-          onClick={() => setFinishOpen(true)}
-        >
-          {allDone ? 'Finalizar Treino ✓' : 'Finalizar Treino'}
-        </Button>
+      <div className="fixed bottom-0 left-0 right-0 px-4 pb-6 pt-3 bg-[#111111] border-t border-[#2A2A2A] z-10">
+        {saved ? (
+          <Button variant="primary" fullWidth size="lg" onClick={() => navigate('/')}>
+            Voltar para a home
+          </Button>
+        ) : (
+          <Button
+            variant={allDone ? 'primary' : 'secondary'}
+            fullWidth
+            size="lg"
+            onClick={() => setFinishOpen(true)}
+          >
+            {allDone ? 'Finalizar Treino ✓' : `Finalizar — ${done.length}/${workout.exercises.length}`}
+          </Button>
+        )}
       </div>
 
       {/* Menu Sheet */}
@@ -325,7 +372,7 @@ export default function WorkoutDetailPage() {
             </button>
           )}
           <button
-            onClick={() => { setMenuOpen(false); /* TODO: export */ }}
+            onClick={handleExport}
             className="flex items-center gap-3 px-4 py-3 text-sm text-[#F0F0F0]"
           >
             <Download size={16} className="text-[#888888]" />
@@ -360,53 +407,17 @@ interface FinishSheetProps {
 }
 
 function FinishSheet({ open, onClose, startTime, onConfirm }: FinishSheetProps) {
-  const now = new Date()
-  const [start, setStart] = useState(toTimeString(startTime))
-  const [end, setEnd] = useState(toTimeString(now))
-
-  function toTimeString(d: Date) {
-    return d.toTimeString().slice(0, 5)
-  }
-
-  function parseTime(timeStr: string, ref: Date) {
-    const [h, m] = timeStr.split(':').map(Number)
-    const d = new Date(ref)
-    d.setHours(h, m, 0, 0)
-    return d
-  }
-
-  const startDate = parseTime(start, startTime)
-  const endDate = parseTime(end, now)
-  const diffMin = Math.max(0, Math.round((endDate.getTime() - startDate.getTime()) / 60000))
+  const durationMin = Math.max(1, Math.round((Date.now() - startTime.getTime()) / 60000))
 
   return (
     <BottomSheet open={open} onClose={onClose} title="Finalizar treino">
-      <div className="px-4 py-4 flex flex-col gap-4">
-        <div className="flex gap-4">
-          <div className="flex-1">
-            <label className="text-xs text-[#888888] block mb-1">Início</label>
-            <input
-              type="time"
-              value={start}
-              onChange={e => setStart(e.target.value)}
-              className="w-full bg-[#252525] text-[#F0F0F0] rounded-xl px-3 py-2.5 text-sm border border-[#2A2A2A] focus:outline-none focus:border-[#4BDF93]"
-            />
-          </div>
-          <div className="flex-1">
-            <label className="text-xs text-[#888888] block mb-1">Fim</label>
-            <input
-              type="time"
-              value={end}
-              onChange={e => setEnd(e.target.value)}
-              className="w-full bg-[#252525] text-[#F0F0F0] rounded-xl px-3 py-2.5 text-sm border border-[#2A2A2A] focus:outline-none focus:border-[#4BDF93]"
-            />
-          </div>
+      <div className="px-4 py-6 flex flex-col gap-6 items-center">
+        <div className="text-center">
+          <p className="text-[#888888] text-sm mb-1">Duração</p>
+          <p className="text-5xl font-bold text-[#4BDF93] tabular-nums">{durationMin}<span className="text-2xl font-normal ml-1">min</span></p>
         </div>
-        <p className="text-center text-[#888888] text-sm">
-          Duração: <span className="text-[#4BDF93] font-semibold">{diffMin} min</span>
-        </p>
-        <Button fullWidth size="lg" onClick={() => onConfirm(startDate, endDate)}>
-          Confirmar
+        <Button fullWidth size="lg" onClick={() => onConfirm(startTime, new Date())}>
+          Salvar treino
         </Button>
       </div>
     </BottomSheet>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Plus, GripVertical, Trash2, ChevronRight } from 'lucide-react'
@@ -17,6 +17,9 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
+const DRAFT_KEY = 'wk_draft'
+const NEW_EX_KEY = 'wk_new_ex'
+
 export default function CreateWorkoutPage() {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
@@ -30,17 +33,51 @@ export default function CreateWorkoutPage() {
   const [comment, setComment] = useState('')
   const [exercises, setExercises] = useState<WorkoutExercise[]>([])
   const [addExSheet, setAddExSheet] = useState(false)
+  const didRestoreRef = useRef(false)
 
   useEffect(() => {
     getSettings().then(s => { if (!author) setAuthor(s.userName) })
   }, [])
+
+  // On mount: restore draft + auto-add newly created exercise (returning from CreateExercisePage)
+  useEffect(() => {
+    if (isEdit || didRestoreRef.current) return
+    didRestoreRef.current = true
+    const rawDraft = sessionStorage.getItem(DRAFT_KEY)
+    const newExId = sessionStorage.getItem(NEW_EX_KEY)
+    sessionStorage.removeItem(DRAFT_KEY)
+    sessionStorage.removeItem(NEW_EX_KEY)
+    if (!rawDraft) return
+    try {
+      const draft = JSON.parse(rawDraft) as { name: string; author: string; comment: string; exercises: WorkoutExercise[] }
+      setName(draft.name)
+      setComment(draft.comment)
+      const base = draft.exercises
+      if (newExId) {
+        const we: WorkoutExercise = { id: uuid(), exerciseId: newExId, reps: '', restSeconds: undefined, comment: '', order: base.length }
+        setExercises([...base, we])
+      } else {
+        setExercises(base)
+      }
+      // Author: prefer draft if filled, otherwise will be set by settings effect
+      if (draft.author) setAuthor(draft.author)
+    } catch { /* ignore */ }
+  }, [isEdit])
 
   useEffect(() => {
     if (existingWorkout) {
       setName(existingWorkout.name)
       setAuthor(existingWorkout.author)
       setComment(existingWorkout.comment ?? '')
-      setExercises(existingWorkout.exercises)
+      const base = existingWorkout.exercises
+      const newExId = sessionStorage.getItem(NEW_EX_KEY)
+      if (newExId) {
+        sessionStorage.removeItem(NEW_EX_KEY)
+        const we: WorkoutExercise = { id: uuid(), exerciseId: newExId, reps: '', restSeconds: undefined, comment: '', order: base.length }
+        setExercises([...base, we])
+      } else {
+        setExercises(base)
+      }
     }
   }, [existingWorkout])
 
@@ -171,7 +208,7 @@ export default function CreateWorkoutPage() {
       </div>
 
       {/* Save button */}
-      <div className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto px-4 pb-6 pt-3 bg-[#111111] border-t border-[#2A2A2A] z-10">
+      <div className="fixed bottom-0 left-0 right-0 px-4 pb-6 pt-3 bg-[#111111] border-t border-[#2A2A2A] z-10">
         <Button fullWidth size="lg" onClick={handleSave} disabled={!name.trim()}>
           {isEdit ? 'Salvar alterações' : 'Criar treino'}
         </Button>
@@ -181,7 +218,11 @@ export default function CreateWorkoutPage() {
       <BottomSheet open={addExSheet} onClose={() => setAddExSheet(false)} title="Adicionar exercício">
         <div className="pb-4">
           <button
-            onClick={() => { setAddExSheet(false); navigate('/exercise/new') }}
+            onClick={() => {
+              setAddExSheet(false)
+              sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ name, author, comment, exercises }))
+              navigate('/exercise/new', { state: { fromWorkout: true } })
+            }}
             className="flex items-center gap-3 px-4 py-3 w-full border-b border-[#2A2A2A]"
           >
             <div className="w-10 h-10 rounded-xl bg-[#FF0D5F]/10 flex items-center justify-center">
