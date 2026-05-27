@@ -7,9 +7,11 @@ import {
 } from 'lucide-react'
 import { db } from '../db'
 import { exportWorkouts } from '../utils/export'
+import { cloneWorkout } from '../utils/clone'
 import VideoThumbnail from '../components/ui/VideoThumbnail'
 import BottomSheet from '../components/ui/BottomSheet'
 import Button from '../components/ui/Button'
+import MenuButton from '../components/ui/MenuButton'
 import { uuid } from '../utils/uuid'
 
 export default function WorkoutDetailPage() {
@@ -128,16 +130,7 @@ export default function WorkoutDetailPage() {
 
   async function handleClone() {
     if (!workout) return
-    const cloned = {
-      ...workout,
-      id: uuid(),
-      name: `${workout.name} (cópia)`,
-      readonly: false,
-      importedAt: undefined,
-      originalId: workout.id,
-      createdAt: Date.now(),
-      isActive: false,
-    }
+    const cloned = cloneWorkout(workout)
     await db.workouts.add(cloned)
     navigate(`/workout/${cloned.id}/edit`)
   }
@@ -343,41 +336,36 @@ export default function WorkoutDetailPage() {
       {/* Menu Sheet */}
       <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} title={workout.name}>
         <div className="flex flex-col py-2">
-          <button
+          <MenuButton
             onClick={() => { setMenuOpen(false); navigate(`/workout/${workout.id}/edit`) }}
-            className="flex items-center gap-3 px-4 py-3 text-sm text-[#F0F0F0]"
+            icon={<Pencil size={16} className="text-[#888888]" />}
           >
-            <Pencil size={16} className="text-[#888888]" />
             Editar treino
-          </button>
-          <button
+          </MenuButton>
+          <MenuButton
             onClick={handleToggleActive}
-            className="flex items-center gap-3 px-4 py-3 text-sm text-[#F0F0F0]"
+            icon={workout.isActive
+              ? <ToggleRight size={16} className="text-[#4BDF93]" />
+              : <ToggleLeft size={16} className="text-[#888888]" />}
           >
-            {workout.isActive ? <ToggleRight size={16} className="text-[#4BDF93]" /> : <ToggleLeft size={16} className="text-[#888888]" />}
             {workout.isActive ? 'Marcar como inativo' : 'Marcar como ativo'}
-          </button>
-          <button
+          </MenuButton>
+          <MenuButton
             onClick={() => { setMenuOpen(false); handleClone() }}
-            className="flex items-center gap-3 px-4 py-3 text-sm text-[#F0F0F0]"
+            icon={<Copy size={16} className="text-[#888888]" />}
           >
-            <Copy size={16} className="text-[#888888]" />
             Clonar treino
-          </button>
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-3 px-4 py-3 text-sm text-[#F0F0F0]"
-          >
-            <Download size={16} className="text-[#888888]" />
+          </MenuButton>
+          <MenuButton onClick={handleExport} icon={<Download size={16} className="text-[#888888]" />}>
             Exportar .treino
-          </button>
-          <button
+          </MenuButton>
+          <MenuButton
             onClick={() => { setMenuOpen(false); handleDelete() }}
-            className="flex items-center gap-3 px-4 py-3 text-sm text-[#FF0D5F]"
+            icon={<Trash2 size={16} />}
+            variant="danger"
           >
-            <Trash2 size={16} />
             Deletar treino
-          </button>
+          </MenuButton>
         </div>
       </BottomSheet>
 

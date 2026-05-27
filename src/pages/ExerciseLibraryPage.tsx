@@ -1,16 +1,26 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Plus } from 'lucide-react'
+import { Plus, Upload } from 'lucide-react'
 import { db } from '../db'
+import { exportExercises } from '../utils/export'
 import { useLongPress } from '../hooks/useLongPress'
 import type { Exercise } from '../types'
 import PageHeader from '../components/ui/PageHeader'
 import VideoThumbnail from '../components/ui/VideoThumbnail'
 import ExerciseContextMenu from '../components/exercise/ExerciseContextMenu'
+import ExportSheet from '../components/ui/ExportSheet'
 
 export default function ExerciseLibraryPage() {
   const navigate = useNavigate()
   const exercises = useLiveQuery(() => db.exercises.orderBy('name').toArray(), [])
+  const [exportSheet, setExportSheet] = useState(false)
+
+  function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    navigate('/import', { state: { file } })
+  }
 
   return (
     <div className="flex flex-col min-h-svh bg-[#111111] pb-24">
@@ -30,6 +40,30 @@ export default function ExerciseLibraryPage() {
         )}
 
         {exercises?.map(ex => <ExerciseItem key={ex.id} exercise={ex} />)}
+
+        {/* Import / Export */}
+        <div className="flex items-center gap-4 py-4">
+          <label className="flex items-center gap-2 text-sm text-[#888888] cursor-pointer">
+            <Upload size={16} />
+            <span>Importar</span>
+            <input
+              type="file"
+              accept=".treino,application/x-treino"
+              className="hidden"
+              onChange={handleImport}
+            />
+          </label>
+          {exercises && exercises.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setExportSheet(true)}
+              className="flex items-center gap-2 text-sm text-[#888888]"
+            >
+              <Upload size={16} className="rotate-180" />
+              <span>Exportar</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* FAB */}
@@ -39,6 +73,21 @@ export default function ExerciseLibraryPage() {
       >
         <Plus size={24} className="text-white" />
       </button>
+
+      {/* Export sheet */}
+      <ExportSheet
+        open={exportSheet}
+        onClose={() => setExportSheet(false)}
+        title="Exportar exercícios"
+        noun="exercício"
+        items={exercises}
+        onExport={exportExercises}
+        renderSub={ex =>
+          ex.variants.length > 0
+            ? `${ex.variants.length} alternativa${ex.variants.length !== 1 ? 's' : ''}`
+            : null
+        }
+      />
     </div>
   )
 }
