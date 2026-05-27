@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Plus, GripVertical, Trash2, ChevronRight } from 'lucide-react'
+import { Plus, GripVertical, Trash2, ChevronRight, Search } from 'lucide-react'
 import { db, getSettings } from '../db'
 import type { WorkoutExercise } from '../types'
 import { uuid } from '../utils/uuid'
@@ -33,6 +33,7 @@ export default function CreateWorkoutPage() {
   const [comment, setComment] = useState('')
   const [exercises, setExercises] = useState<WorkoutExercise[]>([])
   const [addExSheet, setAddExSheet] = useState(false)
+  const [exSearch, setExSearch] = useState('')
   const didRestoreRef = useRef(false)
 
   useEffect(() => {
@@ -217,38 +218,65 @@ export default function CreateWorkoutPage() {
       </div>
 
       {/* Add exercise sheet */}
-      <BottomSheet open={addExSheet} onClose={() => setAddExSheet(false)} title="Adicionar exercício">
+      <BottomSheet open={addExSheet} onClose={() => { setAddExSheet(false); setExSearch('') }} title="Adicionar exercício">
         <div className="pb-4">
-          <button
-            onClick={() => {
-              setAddExSheet(false)
-              sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ name, author, comment, exercises }))
-              navigate('/exercise/new', { state: { fromWorkout: true } })
-            }}
-            className="flex items-center gap-3 px-4 py-3 w-full border-b border-[#2A2A2A]"
-          >
-            <div className="w-10 h-10 rounded-xl bg-[#FF0D5F]/10 flex items-center justify-center">
-              <Plus size={18} className="text-[#FF0D5F]" />
+          {/* Search input */}
+          <div className="px-4 pb-3 border-b border-[#2A2A2A]">
+            <div className="flex items-center gap-2 bg-[#1C1C1C] rounded-xl px-3 py-2 border border-[#2A2A2A]">
+              <Search size={15} className="text-[#888888] flex-shrink-0" />
+              <input
+                value={exSearch}
+                onChange={e => setExSearch(e.target.value)}
+                placeholder="Buscar exercício..."
+                className="flex-1 bg-transparent text-sm text-[#F0F0F0] placeholder-[#888888] focus:outline-none"
+                autoComplete="off"
+              />
             </div>
-            <span className="text-sm text-[#F0F0F0]">Criar novo exercício</span>
-            <ChevronRight size={16} className="text-[#888888] ml-auto" />
-          </button>
-          {allExercises?.map(ex => (
+          </div>
+
+          {/* Create new — only show when search is empty */}
+          {!exSearch && (
             <button
-              key={ex.id}
-              onClick={() => addExercise(ex.id)}
-              className="flex items-center gap-3 px-4 py-3 w-full border-b border-[#2A2A2A] last:border-0"
+              onClick={() => {
+                setAddExSheet(false)
+                setExSearch('')
+                sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ name, author, comment, exercises }))
+                navigate('/exercise/new', { state: { fromWorkout: true } })
+              }}
+              className="flex items-center gap-3 px-4 py-3 w-full border-b border-[#2A2A2A]"
             >
-              <VideoThumbnail thumbnail={ex.video?.thumbnail} size="sm" />
-              <div className="flex-1 min-w-0 text-left">
-                <p className="text-sm text-[#F0F0F0]">{ex.name}</p>
-                {ex.variants.length > 0 && (
-                  <p className="text-xs text-[#888888]">{ex.variants.length} alternativa(s)</p>
-                )}
+              <div className="w-10 h-10 rounded-xl bg-[#FF0D5F]/10 flex items-center justify-center">
+                <Plus size={18} className="text-[#FF0D5F]" />
               </div>
-              <ChevronRight size={16} className="text-[#888888]" />
+              <span className="text-sm text-[#F0F0F0]">Criar novo exercício</span>
+              <ChevronRight size={16} className="text-[#888888] ml-auto" />
             </button>
-          ))}
+          )}
+
+          {/* Exercise list */}
+          {(() => {
+            const q = exSearch.toLowerCase()
+            const filtered = allExercises?.filter(ex => ex.name.toLowerCase().includes(q)) ?? []
+            if (filtered.length === 0) return (
+              <p className="text-center text-sm text-[#888888] py-8">Nenhum exercício encontrado</p>
+            )
+            return filtered.map(ex => (
+              <button
+                key={ex.id}
+                onClick={() => { addExercise(ex.id); setExSearch('') }}
+                className="flex items-center gap-3 px-4 py-3 w-full border-b border-[#2A2A2A] last:border-0"
+              >
+                <VideoThumbnail thumbnail={ex.video?.thumbnail} size="sm" />
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-sm text-[#F0F0F0]">{ex.name}</p>
+                  {ex.variants.length > 0 && (
+                    <p className="text-xs text-[#888888]">{ex.variants.length} alternativa(s)</p>
+                  )}
+                </div>
+                <ChevronRight size={16} className="text-[#888888]" />
+              </button>
+            ))
+          })()}
         </div>
       </BottomSheet>
     </div>
