@@ -84,7 +84,7 @@ export default function ImportPage() {
       const exists = await db.exercises.get(ex.id)
       if (!exists) {
         const deserialized = await deserializeExercise(ex)
-        await db.exercises.add({ ...deserialized, readonly: true, importedFrom: data.workouts[0]?.id })
+        await db.exercises.add({ ...deserialized, importedFrom: data.workouts[0]?.id })
       }
     }
 
@@ -96,7 +96,6 @@ export default function ImportPage() {
       if (!exists) {
         await db.workouts.add({
           ...w,
-          readonly: true,
           importedAt: Date.now(),
           isActive: true,
           order: workoutCount + i,
@@ -167,9 +166,7 @@ export default function ImportPage() {
           ))}
         </div>
 
-        <p className="text-xs text-[#888888] text-center">
-          Treinos importados não podem ser editados, mas podem ser clonados.
-        </p>
+
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 px-4 pb-6 pt-3 bg-[#111111] border-t border-[#2A2A2A] flex flex-col gap-2">

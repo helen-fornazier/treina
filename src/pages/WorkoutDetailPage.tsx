@@ -343,15 +343,13 @@ export default function WorkoutDetailPage() {
       {/* Menu Sheet */}
       <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} title={workout.name}>
         <div className="flex flex-col py-2">
-          {!workout.readonly && (
-            <button
-              onClick={() => { setMenuOpen(false); navigate(`/workout/${workout.id}/edit`) }}
-              className="flex items-center gap-3 px-4 py-3 text-sm text-[#F0F0F0]"
-            >
-              <Pencil size={16} className="text-[#888888]" />
-              Editar treino
-            </button>
-          )}
+          <button
+            onClick={() => { setMenuOpen(false); navigate(`/workout/${workout.id}/edit`) }}
+            className="flex items-center gap-3 px-4 py-3 text-sm text-[#F0F0F0]"
+          >
+            <Pencil size={16} className="text-[#888888]" />
+            Editar treino
+          </button>
           <button
             onClick={handleToggleActive}
             className="flex items-center gap-3 px-4 py-3 text-sm text-[#F0F0F0]"
@@ -359,15 +357,13 @@ export default function WorkoutDetailPage() {
             {workout.isActive ? <ToggleRight size={16} className="text-[#4BDF93]" /> : <ToggleLeft size={16} className="text-[#888888]" />}
             {workout.isActive ? 'Marcar como inativo' : 'Marcar como ativo'}
           </button>
-          {workout.readonly && (
-            <button
-              onClick={() => { setMenuOpen(false); handleClone() }}
-              className="flex items-center gap-3 px-4 py-3 text-sm text-[#F0F0F0]"
-            >
-              <Copy size={16} className="text-[#888888]" />
-              Clonar treino
-            </button>
-          )}
+          <button
+            onClick={() => { setMenuOpen(false); handleClone() }}
+            className="flex items-center gap-3 px-4 py-3 text-sm text-[#F0F0F0]"
+          >
+            <Copy size={16} className="text-[#888888]" />
+            Clonar treino
+          </button>
           <button
             onClick={handleExport}
             className="flex items-center gap-3 px-4 py-3 text-sm text-[#F0F0F0]"

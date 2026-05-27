@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Settings, Calendar, ChevronDown, Upload, Download } from 'lucide-react'
+import { Plus, Settings, Calendar, ChevronDown, Upload, Download, MoreVertical, Dumbbell } from 'lucide-react'
 import { useWorkouts, useSessions, useSettings } from '../hooks/useWorkouts'
 import { exportWorkouts } from '../utils/export'
 import type { Workout } from '../types'
@@ -18,6 +18,7 @@ export default function HomePage() {
 
   const [activeCollapsed, setActiveCollapsed] = useState(false)
   const [inactiveCollapsed, setInactiveCollapsed] = useState(true)
+  const [moreOpen, setMoreOpen] = useState(false)
   const [exportSheet, setExportSheet] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [exporting, setExporting] = useState(false)
@@ -90,8 +91,8 @@ export default function HomePage() {
           <button type="button" onClick={() => navigate('/calendar')} className="p-2 text-[#888888]">
             <Calendar size={22} />
           </button>
-          <button type="button" onClick={() => navigate('/settings')} className="p-2 text-[#888888]">
-            <Settings size={22} />
+          <button type="button" onClick={() => setMoreOpen(true)} className="p-2 text-[#888888]">
+            <MoreVertical size={22} />
           </button>
         </div>
       </div>
@@ -204,6 +205,26 @@ export default function HomePage() {
       >
         <Plus size={28} className="text-white" />
       </button>
+
+      {/* More menu sheet */}
+      <BottomSheet open={moreOpen} onClose={() => setMoreOpen(false)}>
+        <div className="flex flex-col py-2">
+          <button
+            onClick={() => { setMoreOpen(false); navigate('/settings') }}
+            className="flex items-center gap-3 px-4 py-3 text-sm text-[#F0F0F0]"
+          >
+            <Settings size={16} className="text-[#888888]" />
+            Configurações
+          </button>
+          <button
+            onClick={() => { setMoreOpen(false); navigate('/exercises') }}
+            className="flex items-center gap-3 px-4 py-3 text-sm text-[#F0F0F0]"
+          >
+            <Dumbbell size={16} className="text-[#888888]" />
+            Biblioteca de exercícios
+          </button>
+        </div>
+      </BottomSheet>
 
       {/* Export sheet */}
       <BottomSheet open={exportSheet} onClose={() => setExportSheet(false)} title="Exportar treinos">

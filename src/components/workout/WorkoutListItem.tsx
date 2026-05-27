@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, Lock } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../db'
 import type { Workout, WorkoutSession } from '../../types'
@@ -50,7 +50,6 @@ export default function WorkoutListItem({ workout, sessions }: Props) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
             <p className="text-sm font-semibold text-[#F0F0F0] truncate">{workout.name}</p>
-            {workout.readonly && <Lock size={11} className="text-[#888888] flex-shrink-0" />}
           </div>
           <p className="text-xs text-[#888888]">{workout.author} · {workout.exercises.length} exercício{workout.exercises.length !== 1 ? 's' : ''}</p>
           <div className="flex items-center gap-3 mt-1">

@@ -63,15 +63,13 @@ export default function WorkoutContextMenu({ workout, open, onClose }: Props) {
           <Download size={16} className="text-[#888888]" />
           Exportar .treino
         </button>
-        {!workout.readonly && (
-          <button
-            onClick={() => { onClose(); navigate(`/workout/${workout.id}/edit`) }}
-            className="flex items-center gap-3 px-4 py-3 text-sm text-[#F0F0F0]"
-          >
-            <Pencil size={16} className="text-[#888888]" />
-            Editar treino
-          </button>
-        )}
+        <button
+          onClick={() => { onClose(); navigate(`/workout/${workout.id}/edit`) }}
+          className="flex items-center gap-3 px-4 py-3 text-sm text-[#F0F0F0]"
+        >
+          <Pencil size={16} className="text-[#888888]" />
+          Editar treino
+        </button>
         <button onClick={handleDelete} className="flex items-center gap-3 px-4 py-3 text-sm text-[#FF0D5F]">
           <Trash2 size={16} />
           Deletar treino

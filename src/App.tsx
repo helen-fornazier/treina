@@ -11,6 +11,7 @@ import CreateExercisePage from './pages/CreateExercisePage'
 import CalendarPage from './pages/CalendarPage'
 import SettingsPage from './pages/SettingsPage'
 import ImportPage from './pages/ImportPage'
+import ExerciseLibraryPage from './pages/ExerciseLibraryPage'
 
 function NamePrompt() {
   const settings = useSettings()
@@ -70,6 +71,7 @@ export default function App() {
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/import" element={<ImportPage />} />
+        <Route path="/exercises" element={<ExerciseLibraryPage />} />
       </Routes>
     </div>
   )

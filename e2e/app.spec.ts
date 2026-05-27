@@ -166,6 +166,83 @@ test('long-press shows context menu with all actions', async ({ page }) => {
   await expect(page.getByText('Marcar como inativo')).toBeVisible()
 })
 
+// ─── Exercise library ──────────────────────────────────────────────────────────
+
+test('MoreVertical menu opens and navigates to settings', async ({ page }) => {
+  await setupName(page)
+  // Last p-2 button in header is MoreVertical (Calendar is first)
+  await page.locator('header ~ div button.p-2, div button.p-2').last().click()
+  await expect(page.getByText('Configurações')).toBeVisible()
+  await page.getByText('Configurações').click()
+  await expect(page).toHaveURL(/\/settings/)
+})
+
+test('MoreVertical menu navigates to exercise library', async ({ page }) => {
+  await setupName(page)
+  await page.locator('div button.p-2').last().click()
+  await expect(page.getByText('Biblioteca de exercícios')).toBeVisible()
+  await page.getByText('Biblioteca de exercícios').click()
+  await expect(page).toHaveURL(/\/exercises/)
+  await expect(page.getByText('Biblioteca de Exercícios')).toBeVisible()
+})
+
+test('exercise library shows empty state when no exercises', async ({ page }) => {
+  await setupName(page)
+  await page.goto('/exercises')
+  await expect(page.getByText('Nenhum exercício cadastrado ainda.')).toBeVisible()
+})
+
+test('created exercise appears in library', async ({ page }) => {
+  await setupName(page)
+  await page.goto('/exercise/new')
+  await page.locator('input').first().fill('Supino Reto')
+  await page.getByRole('button', { name: /criar exercício/i }).click()
+  await page.waitForTimeout(600)
+  await page.goto('/exercises')
+  await expect(page.getByText('Supino Reto')).toBeVisible()
+})
+
+test('long-press on exercise in library shows context menu', async ({ page }) => {
+  await setupName(page)
+  await page.goto('/exercise/new')
+  await page.locator('input').first().fill('Agachamento')
+  await page.getByRole('button', { name: /criar exercício/i }).click()
+  await page.waitForTimeout(600)
+  await page.goto('/exercises')
+  await expect(page.getByText('Agachamento')).toBeVisible()
+
+  const item = page.locator('button').filter({ hasText: 'Agachamento' }).first()
+  const box = await item.boundingBox()
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2)
+  await page.mouse.down()
+  await page.waitForTimeout(700)
+  await page.mouse.up()
+
+  await expect(page.getByText('Editar exercício')).toBeVisible({ timeout: 3000 })
+  await expect(page.getByText('Exportar .treino')).toBeVisible()
+  await expect(page.getByText('Deletar exercício')).toBeVisible()
+})
+
+test('workout context menu always shows edit without readonly', async ({ page }) => {
+  await setupName(page)
+  await page.locator('button.rounded-full.bg-\\[\\#FF0D5F\\]').click()
+  await page.locator('input').first().fill('Treino Editável')
+  await page.click('button:has-text("Criar treino")')
+  await expect(page.getByText('Treino Editável').first()).toBeVisible()
+
+  const card = page.locator('button.rounded-2xl.p-3').first()
+  const box = await card.boundingBox()
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2)
+  await page.mouse.down()
+  await page.waitForTimeout(700)
+  await page.mouse.up()
+
+  await expect(page.getByText('Editar treino')).toBeVisible({ timeout: 3000 })
+  await expect(page.getByText('Clonar treino')).toBeVisible()
+})
+
+// ─── Clone ─────────────────────────────────────────────────────────────────────
+
 test('clone creates editable copy and navigates to edit', async ({ page }) => {
   await setupName(page)
   await page.locator('button.rounded-full.bg-\\[\\#FF0D5F\\]').click()
