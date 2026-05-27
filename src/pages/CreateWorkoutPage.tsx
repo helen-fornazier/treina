@@ -269,7 +269,7 @@ function SortableExerciseItem({ we, exercise, onChange, onRemove }: SortableItem
   return (
     <div ref={setNodeRef} style={style} className="bg-[#1C1C1C] rounded-2xl border border-[#2A2A2A] overflow-hidden">
       <div className="flex items-center gap-3 p-3">
-        <button {...attributes} {...listeners} className="drag-handle text-[#888888] p-1">
+        <button {...attributes} {...listeners} className="drag-handle text-[#888888] p-1" style={{ touchAction: 'none' }}>
           <GripVertical size={18} />
         </button>
         <VideoThumbnail thumbnail={exercise?.video?.thumbnail} size="sm" />
