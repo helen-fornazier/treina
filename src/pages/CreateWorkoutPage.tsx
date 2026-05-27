@@ -220,9 +220,26 @@ export default function CreateWorkoutPage() {
       {/* Add exercise sheet */}
       <BottomSheet open={addExSheet} onClose={() => { setAddExSheet(false); setExSearch('') }} title="Adicionar exercício">
         <div className="pb-4">
+          {/* Create new */}
+          <button
+            onClick={() => {
+              setAddExSheet(false)
+              setExSearch('')
+              sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ name, author, comment, exercises }))
+              navigate('/exercise/new', { state: { fromWorkout: true } })
+            }}
+            className="flex items-center gap-3 px-4 py-3 w-full border-b border-[#2A2A2A]"
+          >
+            <div className="w-10 h-10 rounded-xl bg-[#FF0D5F]/10 flex items-center justify-center">
+              <Plus size={18} className="text-[#FF0D5F]" />
+            </div>
+            <span className="text-sm text-[#F0F0F0]">Criar novo exercício</span>
+            <ChevronRight size={16} className="text-[#888888] ml-auto" />
+          </button>
+
           {/* Search input */}
-          <div className="px-4 pb-3 border-b border-[#2A2A2A]">
-            <div className="flex items-center gap-2 bg-[#1C1C1C] rounded-xl px-3 py-2 border border-[#2A2A2A]">
+          <div className="px-4 py-3 border-b border-[#2A2A2A]">
+            <div className="flex items-center gap-2 bg-[#252525] rounded-xl px-3 py-2 border border-[#2A2A2A]">
               <Search size={15} className="text-[#888888] flex-shrink-0" />
               <input
                 value={exSearch}
@@ -233,25 +250,6 @@ export default function CreateWorkoutPage() {
               />
             </div>
           </div>
-
-          {/* Create new — only show when search is empty */}
-          {!exSearch && (
-            <button
-              onClick={() => {
-                setAddExSheet(false)
-                setExSearch('')
-                sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ name, author, comment, exercises }))
-                navigate('/exercise/new', { state: { fromWorkout: true } })
-              }}
-              className="flex items-center gap-3 px-4 py-3 w-full border-b border-[#2A2A2A]"
-            >
-              <div className="w-10 h-10 rounded-xl bg-[#FF0D5F]/10 flex items-center justify-center">
-                <Plus size={18} className="text-[#FF0D5F]" />
-              </div>
-              <span className="text-sm text-[#F0F0F0]">Criar novo exercício</span>
-              <ChevronRight size={16} className="text-[#888888] ml-auto" />
-            </button>
-          )}
 
           {/* Exercise list */}
           {(() => {
