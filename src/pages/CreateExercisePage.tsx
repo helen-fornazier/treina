@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Plus, Trash2, Mic, Square, Play, Pause } from 'lucide-react'
+import { Plus, Trash2, Mic, Square, Play, Pause, Video } from 'lucide-react'
 import { db } from '../db'
 import type { ExerciseVariant } from '../types'
 import { uuid } from '../utils/uuid'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
 import VideoThumbnail from '../components/ui/VideoThumbnail'
+import VideoSourceSheet from '../components/ui/VideoSourceSheet'
 
 export default function CreateExercisePage() {
   const navigate = useNavigate()
@@ -20,7 +21,11 @@ export default function CreateExercisePage() {
   const [name, setName] = useState('')
   const [comment, setComment] = useState('')
   const [videoFile, setVideoFile] = useState<File | null>(null)
+  const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [thumbnail, setThumbnail] = useState<string>('')
+  const [videoPickerOpen, setVideoPickerOpen] = useState(false)
+  const [variantPickerOpen, setVariantPickerOpen] = useState(false)
+  const [activeVariantId, setActiveVariantId] = useState<string | null>(null)
   const [variants, setVariants] = useState<ExerciseVariant[]>([])
   const [recording, setRecording] = useState(false)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
@@ -42,25 +47,40 @@ export default function CreateExercisePage() {
       setComment(existing.comment ?? '')
       setVariants(existing.variants)
       setThumbnail(existing.video?.thumbnail ?? '')
+      setVideoUrl(existing.video?.url ?? null)
     }
   }, [existing])
 
-  async function handleVideoChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-
+  async function handleVideoFile(file: File) {
     const video = document.createElement('video')
     video.src = URL.createObjectURL(file)
     await new Promise(res => { video.onloadedmetadata = res })
-
     if (video.duration > 60) {
       alert('O vídeo deve ter no máximo 1 minuto.')
       return
     }
-
     setVideoFile(file)
-    const thumb = await generateThumbnail(video)
+    setVideoUrl(null)
+    setThumbnail(await generateThumbnail(video))
+  }
+
+  function handleVideoUrl(url: string, thumb: string) {
+    setVideoUrl(url)
+    setVideoFile(null)
     setThumbnail(thumb)
+  }
+
+  async function handleVariantFile(variantId: string, file: File) {
+    const vid = document.createElement('video')
+    vid.src = URL.createObjectURL(file)
+    await new Promise(res => { vid.onloadedmetadata = res })
+    if (vid.duration > 60) { alert('Máximo 1 minuto'); return }
+    const thumb = await generateThumbnail(vid)
+    updateVariant(variantId, { video: { blob: file, thumbnail: thumb, duration: vid.duration, isHD: false } })
+  }
+
+  function handleVariantUrl(variantId: string, url: string, thumb: string) {
+    updateVariant(variantId, { video: { url, thumbnail: thumb, duration: 0, isHD: false } })
   }
 
   async function generateThumbnail(video: HTMLVideoElement): Promise<string> {
@@ -147,12 +167,9 @@ export default function CreateExercisePage() {
 
     let videoData = existing?.video
     if (videoFile) {
-      videoData = {
-        blob: videoFile,
-        thumbnail,
-        duration: 0,
-        isHD: false,
-      }
+      videoData = { blob: videoFile, thumbnail, duration: 0, isHD: false }
+    } else if (videoUrl) {
+      videoData = { url: videoUrl, thumbnail, duration: 0, isHD: false }
     }
 
     let audioData = existing?.audio
@@ -200,14 +217,17 @@ export default function CreateExercisePage() {
 
         {/* Video upload */}
         <div>
-          <label className="text-xs text-[#888888] mb-2 block">Vídeo (máx. 1 minuto)</label>
+          <label className="text-xs text-[#888888] mb-2 block">Vídeo (máx. 1 minuto para arquivo/câmera)</label>
           <div className="flex items-center gap-3">
             <VideoThumbnail thumbnail={thumbnail} size="md" />
-            <label className="flex items-center gap-2 text-sm text-[#4BDF93] cursor-pointer">
-              <Plus size={14} />
+            <button
+              type="button"
+              onClick={() => setVideoPickerOpen(true)}
+              className="flex items-center gap-2 text-sm text-[#4BDF93]"
+            >
+              <Video size={14} />
               {thumbnail ? 'Trocar vídeo' : 'Adicionar vídeo'}
-              <input type="file" accept="video/*" className="hidden" onChange={handleVideoChange} />
-            </label>
+            </button>
           </div>
         </div>
 
@@ -287,33 +307,14 @@ export default function CreateExercisePage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <VideoThumbnail thumbnail={v.video?.thumbnail} size="sm" />
-                  <label className="text-sm text-[#4BDF93] cursor-pointer">
-                    <Plus size={14} className="inline mr-1" />
+                  <button
+                    type="button"
+                    onClick={() => { setActiveVariantId(v.id); setVariantPickerOpen(true) }}
+                    className="flex items-center gap-1 text-sm text-[#4BDF93]"
+                  >
+                    <Plus size={14} />
                     Vídeo
-                    <input
-                      type="file"
-                      accept="video/*"
-                      className="hidden"
-                      onChange={async e => {
-                        const file = e.target.files?.[0]
-                        if (!file) return
-                        const vid = document.createElement('video')
-                        vid.src = URL.createObjectURL(file)
-                        await new Promise(res => { vid.onloadedmetadata = res })
-                        if (vid.duration > 60) { alert('Máximo 1 minuto'); return }
-                        const thumb = await new Promise<string>(res => {
-                          vid.currentTime = 0
-                          vid.onseeked = () => {
-                            const c = document.createElement('canvas')
-                            c.width = 320; c.height = 180
-                            c.getContext('2d')!.drawImage(vid, 0, 0, 320, 180)
-                            res(c.toDataURL('image/jpeg', 0.7))
-                          }
-                        })
-                        updateVariant(v.id, { video: { blob: file, thumbnail: thumb, duration: vid.duration, isHD: false } })
-                      }}
-                    />
-                  </label>
+                  </button>
                 </div>
                 <input
                   value={v.comment ?? ''}
@@ -333,6 +334,19 @@ export default function CreateExercisePage() {
           {isEdit ? 'Salvar' : 'Criar exercício'}
         </Button>
       </div>
+
+      <VideoSourceSheet
+        open={videoPickerOpen}
+        onClose={() => setVideoPickerOpen(false)}
+        onFile={handleVideoFile}
+        onUrl={handleVideoUrl}
+      />
+      <VideoSourceSheet
+        open={variantPickerOpen}
+        onClose={() => { setVariantPickerOpen(false); setActiveVariantId(null) }}
+        onFile={file => activeVariantId && handleVariantFile(activeVariantId, file)}
+        onUrl={(url, thumb) => activeVariantId && handleVariantUrl(activeVariantId, url, thumb)}
+      />
     </div>
   )
 }

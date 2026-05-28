@@ -113,27 +113,8 @@ export default function ExercisePage() {
         </h1>
       </header>
 
-      {/* Video — max 50% viewport height, stable src */}
-      <div className="w-full bg-[#000] flex items-center justify-center" style={{ maxHeight: '50svh' }}>
-        {videoSrc ? (
-          <video
-            src={videoSrc}
-            autoPlay
-            loop
-            playsInline
-            muted
-            className="w-full object-contain"
-            style={{ maxHeight: '50svh' }}
-          />
-        ) : (
-          <div className="w-full flex items-center justify-center text-[#555555]" style={{ height: '30svh' }}>
-            <div className="flex flex-col items-center gap-2">
-              <Play size={40} />
-              <span className="text-xs">Sem vídeo</span>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Video */}
+      <VideoPlayer video={activeOption?.video} videoSrc={videoSrc} />
 
       <div className="flex flex-col gap-4 px-4 mt-4">
         {/* Stats */}
@@ -238,6 +219,48 @@ export default function ExercisePage() {
         )}
       </div>
     </div>
+  )
+}
+
+interface VideoPlayerProps {
+  video: ExerciseVideo | undefined
+  videoSrc: string | undefined
+}
+
+function VideoPlayer({ video, videoSrc }: VideoPlayerProps) {
+  if (!video) {
+    return (
+      <div className="w-full flex items-center justify-center text-[#555555]" style={{ height: '30svh' }}>
+        <div className="flex flex-col items-center gap-2">
+          <Play size={40} />
+          <span className="text-xs">Sem vídeo</span>
+        </div>
+      </div>
+    )
+  }
+
+  const isYouTube = video.url?.includes('youtube.com/embed')
+  const tapUrl = videoSrc ?? video.url
+
+  if (isYouTube) {
+    return (
+      <div className="relative w-full bg-[#000]" style={{ aspectRatio: '16/9', maxHeight: '50svh' }}>
+        <iframe
+          src={video.url}
+          className="absolute inset-0 w-full h-full"
+          allow="autoplay; fullscreen"
+          allowFullScreen
+        />
+        <a href={video.url} target="_blank" rel="noopener" className="absolute inset-0" aria-label="Abrir vídeo" />
+      </div>
+    )
+  }
+
+  const src = videoSrc ?? video.url
+  return (
+    <a href={tapUrl} target="_blank" rel="noopener" className="block w-full bg-[#000]">
+      <video src={src} autoPlay loop playsInline muted className="w-full object-contain" style={{ maxHeight: '50svh' }} />
+    </a>
   )
 }
 

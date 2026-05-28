@@ -1,4 +1,4 @@
-import { Play } from 'lucide-react'
+import { Play, Video } from 'lucide-react'
 
 interface Props {
   thumbnail?: string
@@ -15,7 +15,11 @@ export default function VideoThumbnail({ thumbnail, className = '', onClick, siz
       className={`relative rounded-xl overflow-hidden bg-[#252525] flex items-center justify-center flex-shrink-0 ${sizes[size]} ${className} ${onClick ? 'cursor-pointer' : ''}`}
       onClick={onClick}
     >
-      {thumbnail ? (
+      {thumbnail === 'icon' ? (
+        <div className="flex flex-col items-center gap-1">
+          <Video size={20} className="text-[#4BDF93]" />
+        </div>
+      ) : thumbnail ? (
         <>
           <img src={thumbnail} alt="" className="w-full h-full object-cover" />
           {onClick && (

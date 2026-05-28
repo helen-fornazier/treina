@@ -1,7 +1,8 @@
 export interface ExerciseVideo {
-  blob: Blob
-  thumbnail: string // base64 data URL
-  duration: number  // seconds
+  blob?: Blob       // undefined for URL-based videos
+  url?: string      // original external URL (YouTube, Instagram, direct)
+  thumbnail: string // base64 data URL, YouTube thumb URL, or 'icon' sentinel
+  duration: number  // seconds (0 if unknown)
   isHD: boolean
 }
 
