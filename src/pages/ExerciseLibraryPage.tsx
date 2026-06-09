@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Plus, Upload } from 'lucide-react'
 import { db } from '../db'
-import { exportExercises } from '../utils/export'
+import { buildExercisesFile } from '../utils/export'
 import { useLongPress } from '../hooks/useLongPress'
 import type { Exercise } from '../types'
 import PageHeader from '../components/ui/PageHeader'
@@ -81,7 +81,7 @@ export default function ExerciseLibraryPage() {
         title="Exportar exercícios"
         noun="exercício"
         items={exercises}
-        onExport={exportExercises}
+        onBuild={buildExercisesFile}
         renderSub={ex =>
           ex.variants.length > 0
             ? `${ex.variants.length} alternativa${ex.variants.length !== 1 ? 's' : ''}`

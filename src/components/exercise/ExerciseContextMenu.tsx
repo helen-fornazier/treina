@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Pencil, Copy, Download, Trash2 } from 'lucide-react'
+import { Pencil, Copy, Download, Trash2, Share2 } from 'lucide-react'
 import { db } from '../../db'
-import { exportExercises } from '../../utils/export'
+import { buildExercisesFile, shareOrDownload } from '../../utils/export'
 import { uuid } from '../../utils/uuid'
 import type { Exercise } from '../../types'
 import BottomSheet from '../ui/BottomSheet'
@@ -19,6 +19,8 @@ export default function ExerciseContextMenu({ exercise, open, onClose }: Props) 
   const navigate = useNavigate()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [affectedWorkouts, setAffectedWorkouts] = useState<string[]>([])
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [building, setBuilding] = useState(false)
 
   async function handleClone() {
     const cloned: Exercise = { ...exercise, id: uuid(), name: `${exercise.name} (cópia)` }
@@ -28,8 +30,25 @@ export default function ExerciseContextMenu({ exercise, open, onClose }: Props) 
   }
 
   async function handleExport() {
+    setBuilding(true)
+    try {
+      const file = await buildExercisesFile([exercise])
+      setPendingFile(file)
+    } finally {
+      setBuilding(false)
+    }
+  }
+
+  async function handleShare() {
+    if (!pendingFile) return
+    await shareOrDownload(pendingFile)
+    handleClose()
+  }
+
+  function handleClose() {
+    setPendingFile(null)
+    setBuilding(false)
     onClose()
-    await exportExercises([exercise])
   }
 
   async function handleDeletePress() {
@@ -63,24 +82,37 @@ export default function ExerciseContextMenu({ exercise, open, onClose }: Props) 
 
   return (
     <>
-      <BottomSheet open={open} onClose={onClose} title={exercise.name}>
-        <div className="flex flex-col py-2">
-          <MenuButton
-            onClick={() => { onClose(); navigate(`/exercise/${exercise.id}/edit`) }}
-            icon={<Pencil size={16} className="text-[#888888]" />}
-          >
-            Editar exercício
-          </MenuButton>
-          <MenuButton onClick={handleClone} icon={<Copy size={16} className="text-[#888888]" />}>
-            Clonar exercício
-          </MenuButton>
-          <MenuButton onClick={handleExport} icon={<Download size={16} className="text-[#888888]" />}>
-            Exportar .treino
-          </MenuButton>
-          <MenuButton onClick={handleDeletePress} icon={<Trash2 size={16} />} variant="danger">
-            Deletar exercício
-          </MenuButton>
-        </div>
+      <BottomSheet open={open} onClose={handleClose} title={exercise.name}>
+        {pendingFile ? (
+          <div className="flex flex-col items-center gap-4 px-4 py-6">
+            <div className="w-12 h-12 rounded-full bg-[#4BDF93]/10 flex items-center justify-center">
+              <Share2 size={22} className="text-[#4BDF93]" />
+            </div>
+            <p className="text-xs text-[#888888]">Arquivo pronto para compartilhar</p>
+            <div className="flex gap-2 w-full pb-2">
+              <Button variant="ghost" fullWidth onClick={handleClose}>Cancelar</Button>
+              <Button fullWidth onClick={handleShare}>Compartilhar</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col py-2">
+            <MenuButton
+              onClick={() => { onClose(); navigate(`/exercise/${exercise.id}/edit`) }}
+              icon={<Pencil size={16} className="text-[#888888]" />}
+            >
+              Editar exercício
+            </MenuButton>
+            <MenuButton onClick={handleClone} icon={<Copy size={16} className="text-[#888888]" />}>
+              Clonar exercício
+            </MenuButton>
+            <MenuButton onClick={handleExport} icon={<Download size={16} className="text-[#888888]" />} disabled={building}>
+              {building ? 'Preparando...' : 'Exportar .treino'}
+            </MenuButton>
+            <MenuButton onClick={handleDeletePress} icon={<Trash2 size={16} />} variant="danger">
+              Deletar exercício
+            </MenuButton>
+          </div>
+        )}
       </BottomSheet>
 
       <BottomSheet open={confirmOpen} onClose={() => setConfirmOpen(false)} title="Deletar exercício?">

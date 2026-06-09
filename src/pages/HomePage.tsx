@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Settings, Calendar, ChevronDown, Upload, MoreVertical, Dumbbell } from 'lucide-react'
 import { useWorkouts, useSessions, useSettings } from '../hooks/useWorkouts'
-import { exportWorkouts } from '../utils/export'
+import { buildWorkoutsFile } from '../utils/export'
 import StatsBanner from '../components/workout/StatsBanner'
 import SuggestedWorkout from '../components/workout/SuggestedWorkout'
 import WorkoutListItem from '../components/workout/WorkoutListItem'
@@ -193,7 +193,7 @@ export default function HomePage() {
         title="Exportar treinos"
         noun="treino"
         items={workouts}
-        onExport={exportWorkouts}
+        onBuild={buildWorkoutsFile}
         renderSub={w => `${w.exercises.length} exercício${w.exercises.length !== 1 ? 's' : ''}`}
       />
     </div>

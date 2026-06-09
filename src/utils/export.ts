@@ -29,45 +29,44 @@ async function serializeExercise(ex: Exercise): Promise<Record<string, unknown>>
   return result
 }
 
-async function shareOrDownload(blob: Blob, filename: string) {
-  if (navigator.share) {
-    const shareFile = new File([blob], filename, { type: 'text/plain' })
-    if (navigator.canShare?.({ files: [shareFile] }) !== false) {
-      try {
-        await navigator.share({ files: [shareFile], title: filename })
-        return
-      } catch (e) {
-        if (e instanceof DOMException && e.name === 'AbortError') return
-      }
-    }
-  }
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
-export async function exportWorkouts(workouts: Workout[]): Promise<void> {
+// Build the File object (async, heavy) — call this before triggering share/download
+export async function buildWorkoutsFile(workouts: Workout[]): Promise<File> {
   const exerciseIds = [...new Set(workouts.flatMap(w => w.exercises.map(e => e.exerciseId)))]
   const rawExercises = await Promise.all(exerciseIds.map(id => db.exercises.get(id)))
   const serialized = await Promise.all(rawExercises.filter(Boolean).map(ex => serializeExercise(ex!)))
-
   const payload = { version: 1, exported_at: new Date().toISOString(), workouts, exercise_library: serialized }
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/x-treino' })
   const filename = workouts.length === 1
     ? `${workouts[0].name.replace(/\s+/g, '_')}.treino`
     : `treinos_${new Date().toISOString().slice(0, 10)}.treino`
-  await shareOrDownload(blob, filename)
+  return new File([JSON.stringify(payload, null, 2)], filename, { type: 'application/x-treino' })
 }
 
-export async function exportExercises(exercises: Exercise[]): Promise<void> {
+export async function buildExercisesFile(exercises: Exercise[]): Promise<File> {
   const serialized = await Promise.all(exercises.map(serializeExercise))
   const payload = { version: 1, exported_at: new Date().toISOString(), workouts: [], exercise_library: serialized }
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/x-treino' })
   const filename = exercises.length === 1
     ? `${exercises[0].name.replace(/\s+/g, '_')}.treino`
     : `exercicios_${new Date().toISOString().slice(0, 10)}.treino`
-  await shareOrDownload(blob, filename)
+  return new File([JSON.stringify(payload, null, 2)], filename, { type: 'application/x-treino' })
+}
+
+// Share or download — call this directly from a user gesture (button click) with a pre-built File
+export async function shareOrDownload(file: File): Promise<void> {
+  if (navigator.share && navigator.canShare?.({ files: [file] }) !== false) {
+    try {
+      await navigator.share({ files: [file], title: file.name })
+      return
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return
+      // NotAllowedError or other — fall through to download
+    }
+  }
+  const url = URL.createObjectURL(file)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = file.name
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  setTimeout(() => URL.revokeObjectURL(url), 5000)
 }
