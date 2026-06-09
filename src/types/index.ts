@@ -41,6 +41,7 @@ export interface WorkoutExercise {
   comment?: string         // professor note for this workout context
   order: number
   userNotes?: string       // user personal notes
+  load?: number            // kg
 }
 
 export interface WorkoutSession {

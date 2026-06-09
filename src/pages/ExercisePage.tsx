@@ -42,6 +42,7 @@ export default function ExercisePage() {
   const [commentOpen, setCommentOpen] = useState(false)
   const [alternativesOpen, setAlternativesOpen] = useState(false)
   const [notes, setNotes] = useState(workoutExercise?.userNotes ?? '')
+  const [load, setLoad] = useState(workoutExercise?.load?.toString() ?? '')
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const options = useMemo<Option[]>(() => {
@@ -77,10 +78,11 @@ export default function ExercisePage() {
     if (audioRef.current) audioRef.current.playbackRate = next
   }
 
-  async function saveNotes() {
+  async function saveUserFields() {
     if (!workout || !workoutExerciseId) return
+    const parsedLoad = load !== '' ? parseInt(load, 10) : undefined
     const updated = workout.exercises.map(e =>
-      e.id === workoutExerciseId ? { ...e, userNotes: notes } : e
+      e.id === workoutExerciseId ? { ...e, userNotes: notes, load: isNaN(parsedLoad!) ? undefined : parsedLoad } : e
     )
     await db.workouts.update(workout.id, { exercises: updated })
   }
@@ -178,13 +180,30 @@ export default function ExercisePage() {
           </div>
         )}
 
-        {/* User notes */}
+        {/* User notes + load */}
         <div>
-          <p className="text-xs text-[#888888] mb-2">Suas anotações</p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-[#888888]">Suas anotações</p>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-[#888888]">Carga</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min="0"
+                step="1"
+                value={load}
+                onChange={e => setLoad(e.target.value)}
+                onBlur={saveUserFields}
+                placeholder="—"
+                className="w-14 bg-[#1C1C1C] text-[#F0F0F0] rounded-lg px-2 py-1 text-sm border border-[#2A2A2A] focus:outline-none focus:border-[#4BDF93] text-center placeholder-[#888888]"
+              />
+              <span className="text-xs text-[#888888]">kg</span>
+            </div>
+          </div>
           <textarea
             value={notes}
             onChange={e => setNotes(e.target.value)}
-            onBlur={saveNotes}
+            onBlur={saveUserFields}
             placeholder="Adicione anotações sobre este exercício..."
             rows={3}
             className="w-full bg-[#1C1C1C] text-[#F0F0F0] rounded-xl p-3 text-sm border border-[#2A2A2A] resize-none focus:outline-none focus:border-[#4BDF93] placeholder-[#888888]"
