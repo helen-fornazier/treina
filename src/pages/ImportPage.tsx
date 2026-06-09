@@ -7,6 +7,7 @@ import { Download, AlertCircle } from 'lucide-react'
 
 interface SerializedVideo {
   data?: string
+  url?: string
   thumbnail: string
   duration: number
   isHD: boolean
@@ -58,6 +59,8 @@ export default function ImportPage() {
     if (ex.video?.data) {
       const blob = await fetch(ex.video.data).then(r => r.blob())
       result.video = { blob, thumbnail: ex.video.thumbnail, duration: ex.video.duration, isHD: ex.video.isHD }
+    } else if (ex.video?.url) {
+      result.video = { url: ex.video.url, thumbnail: ex.video.thumbnail, duration: ex.video.duration, isHD: ex.video.isHD }
     } else {
       result.video = undefined
     }
@@ -68,7 +71,12 @@ export default function ImportPage() {
       result.audio = undefined
     }
     result.variants = await Promise.all(ex.variants.map(async v => {
-      if (!v.video?.data) return { ...v, video: undefined } as ExerciseVariant
+      if (!v.video?.data) {
+        const vid = v.video?.url
+          ? { url: v.video.url, thumbnail: v.video.thumbnail, duration: v.video.duration, isHD: v.video.isHD }
+          : undefined
+        return { ...v, video: vid } as ExerciseVariant
+      }
       const blob = await fetch(v.video.data).then(r => r.blob())
       return { ...v, video: { blob, thumbnail: v.video.thumbnail, duration: v.video.duration, isHD: v.video.isHD } } as ExerciseVariant
     }))

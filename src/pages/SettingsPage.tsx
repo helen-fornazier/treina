@@ -73,7 +73,7 @@ export default function SettingsPage() {
         </div>
 
         <div className="mt-4 pt-4 border-t border-[#2A2A2A]">
-          <p className="text-xs text-[#888888] text-center">Treina v0.1.0</p>
+          <p className="text-xs text-[#888888] text-center">Treina v0.2</p>
         </div>
       </div>
     </div>

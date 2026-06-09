@@ -15,7 +15,7 @@ async function serializeExercise(ex: Exercise): Promise<Record<string, unknown>>
   if (ex.video?.blob) {
     result.video = { thumbnail: ex.video.thumbnail, duration: ex.video.duration, isHD: ex.video.isHD, data: await blobToBase64(ex.video.blob) }
   } else {
-    result.video = ex.video ? { thumbnail: ex.video.thumbnail, duration: ex.video.duration, isHD: ex.video.isHD } : undefined
+    result.video = ex.video ? { url: ex.video.url, thumbnail: ex.video.thumbnail, duration: ex.video.duration, isHD: ex.video.isHD } : undefined
   }
   if (ex.audio?.blob) {
     result.audio = { duration: ex.audio.duration, data: await blobToBase64(ex.audio.blob) }
@@ -23,7 +23,7 @@ async function serializeExercise(ex: Exercise): Promise<Record<string, unknown>>
     result.audio = undefined
   }
   result.variants = await Promise.all(ex.variants.map(async v => {
-    if (!v.video?.blob) return { ...v, video: v.video ? { thumbnail: v.video.thumbnail, duration: v.video.duration, isHD: v.video.isHD } : undefined }
+    if (!v.video?.blob) return { ...v, video: v.video ? { url: v.video.url, thumbnail: v.video.thumbnail, duration: v.video.duration, isHD: v.video.isHD } : undefined }
     return { ...v, video: { thumbnail: v.video.thumbnail, duration: v.video.duration, isHD: v.video.isHD, data: await blobToBase64(v.video.blob) } }
   }))
   return result
