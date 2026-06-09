@@ -5,6 +5,10 @@ import './index.css'
 import App from './App.tsx'
 import { getSettings } from './db'
 
+if (import.meta.env.DEV || localStorage.getItem('treina_debug') === '1') {
+  import('eruda').then(m => m.default.init())
+}
+
 // Seed the settings record before React mounts so useLiveQuery reads never
 // try to write inside the read-only liveQuery transaction.
 getSettings().then(() => {

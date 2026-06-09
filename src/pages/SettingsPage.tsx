@@ -3,10 +3,27 @@ import { getSettings, saveSettings } from '../db'
 import PageHeader from '../components/ui/PageHeader'
 import Button from '../components/ui/Button'
 
+const DEBUG_KEY = 'treina_debug'
+
 export default function SettingsPage() {
   const [userName, setUserName] = useState('')
   const [metricsFrom, setMetricsFrom] = useState<'allTime' | 'month' | 'year'>('allTime')
   const [saved, setSaved] = useState(false)
+  const [debugEnabled, setDebugEnabled] = useState(() => localStorage.getItem(DEBUG_KEY) === '1')
+
+  async function toggleDebug() {
+    const next = !debugEnabled
+    if (next) {
+      localStorage.setItem(DEBUG_KEY, '1')
+      const m = await import('eruda')
+      m.default.init()
+    } else {
+      localStorage.removeItem(DEBUG_KEY)
+      const m = await import('eruda')
+      m.default.destroy()
+    }
+    setDebugEnabled(next)
+  }
 
   useEffect(() => {
     getSettings().then(s => {
@@ -72,8 +89,22 @@ export default function SettingsPage() {
           </Button>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-[#2A2A2A]">
-          <p className="text-xs text-[#888888] text-center">Treina v0.3</p>
+        <div className="pt-2 border-t border-[#2A2A2A]">
+          <button
+            onClick={toggleDebug}
+            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm transition-colors ${
+              debugEnabled
+                ? 'border-[#4BDF93]/40 bg-[#4BDF93]/10 text-[#4BDF93]'
+                : 'border-[#2A2A2A] bg-[#1C1C1C] text-[#888888]'
+            }`}
+          >
+            <span>Modo debug</span>
+            <span className="text-xs">{debugEnabled ? 'Ativado' : 'Desativado'}</span>
+          </button>
+        </div>
+
+        <div className="border-t border-[#2A2A2A] pt-4">
+          <p className="text-xs text-[#888888] text-center">Treina v0.4</p>
         </div>
       </div>
     </div>
