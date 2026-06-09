@@ -221,7 +221,11 @@ export default function WorkoutDetailPage() {
                     <p className="text-sm font-semibold text-[#F0F0F0] truncate">
                       {ex?.name ?? 'Exercício'}
                     </p>
-                    {we.reps && <p className="text-xs text-[#888888]">{we.reps}</p>}
+                    {(we.reps || we.load) && (
+                      <p className="text-xs text-[#888888]">
+                        {[we.reps, we.load != null ? `${we.load} kg` : null].filter(Boolean).join(' · ')}
+                      </p>
+                    )}
                   </div>
                   <ChevronRight size={16} className="text-[#888888] flex-shrink-0" />
                 </button>
@@ -300,7 +304,11 @@ export default function WorkoutDetailPage() {
                     <VideoThumbnail thumbnail={thumbnail} size="sm" className="grayscale" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-[#888888] truncate">{ex?.name}</p>
-                      {we.reps && <p className="text-xs text-[#888888]">{we.reps}</p>}
+                      {(we.reps || we.load) && (
+                        <p className="text-xs text-[#888888]">
+                          {[we.reps, we.load != null ? `${we.load} kg` : null].filter(Boolean).join(' · ')}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -41,9 +41,19 @@ export default function ExercisePage() {
   const [audioPlaying, setAudioPlaying] = useState(false)
   const [commentOpen, setCommentOpen] = useState(false)
   const [alternativesOpen, setAlternativesOpen] = useState(false)
-  const [notes, setNotes] = useState(workoutExercise?.userNotes ?? '')
-  const [load, setLoad] = useState(workoutExercise?.load?.toString() ?? '')
+  const [notes, setNotes] = useState('')
+  const [load, setLoad] = useState('')
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const initialized = useRef(false)
+
+  // useLiveQuery resolves async; initialize local fields once on first load
+  useEffect(() => {
+    if (workoutExercise && !initialized.current) {
+      initialized.current = true
+      setNotes(workoutExercise.userNotes ?? '')
+      setLoad(workoutExercise.load?.toString() ?? '')
+    }
+  }, [workoutExercise])
 
   const options = useMemo<Option[]>(() => {
     if (!exercise) return []
