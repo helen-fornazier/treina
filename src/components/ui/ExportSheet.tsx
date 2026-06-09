@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { Share2 } from 'lucide-react'
 import BottomSheet from './BottomSheet'
 import Button from './Button'
-import { shareOrDownload } from '../../utils/export'
+import ShareReadyPanel from './ShareReadyPanel'
+import { usePendingExport } from '../../hooks/useExport'
 
 interface Props<T extends { id: string; name: string }> {
   open: boolean
@@ -19,8 +19,7 @@ export default function ExportSheet<T extends { id: string; name: string }>({
   open, onClose, title, noun, items, onBuild, renderSub,
 }: Props<T>) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [building, setBuilding] = useState(false)
-  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const { pendingFile, building, build, share, clear } = usePendingExport(onBuild)
 
   function toggle(id: string) {
     setSelected(prev => {
@@ -42,24 +41,11 @@ export default function ExportSheet<T extends { id: string; name: string }>({
     if (!items) return
     const toExport = items.filter(i => selected.has(i.id))
     if (toExport.length === 0) return
-    setBuilding(true)
-    try {
-      const file = await onBuild(toExport)
-      setPendingFile(file)
-    } finally {
-      setBuilding(false)
-    }
-  }
-
-  // Called directly from a button click — user gesture context is fresh, navigator.share works on iOS
-  async function handleShare() {
-    if (!pendingFile) return
-    await shareOrDownload(pendingFile)
-    handleClose()
+    await build(toExport)
   }
 
   function handleClose() {
-    setPendingFile(null)
+    clear()
     setSelected(new Set())
     onClose()
   }
@@ -70,19 +56,11 @@ export default function ExportSheet<T extends { id: string; name: string }>({
   return (
     <BottomSheet open={open} onClose={handleClose} title={title}>
       {pendingFile ? (
-        <div className="flex flex-col items-center gap-4 px-4 py-6">
-          <div className="w-12 h-12 rounded-full bg-[#4BDF93]/10 flex items-center justify-center">
-            <Share2 size={22} className="text-[#4BDF93]" />
-          </div>
-          <div className="text-center">
-            <p className="text-sm text-[#F0F0F0] font-medium">{pendingFile.name}</p>
-            <p className="text-xs text-[#888888] mt-1">Arquivo pronto para compartilhar</p>
-          </div>
-          <div className="flex gap-2 w-full pb-2">
-            <Button variant="ghost" fullWidth onClick={handleClose}>Cancelar</Button>
-            <Button fullWidth size="lg" onClick={handleShare}>Compartilhar</Button>
-          </div>
-        </div>
+        <ShareReadyPanel
+          filename={pendingFile.name}
+          onShare={async () => { await share(); onClose() }}
+          onCancel={handleClose}
+        />
       ) : (
         <div className="flex flex-col">
           <button

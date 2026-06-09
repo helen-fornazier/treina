@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Pencil, Copy, Download, Trash2, Share2 } from 'lucide-react'
+import { Pencil, Copy, Download, Trash2 } from 'lucide-react'
 import { db } from '../../db'
-import { buildExercisesFile, shareOrDownload } from '../../utils/export'
+import { buildExercisesFile } from '../../utils/export'
+import { usePendingExport } from '../../hooks/useExport'
 import { uuid } from '../../utils/uuid'
 import type { Exercise } from '../../types'
 import BottomSheet from '../ui/BottomSheet'
 import Button from '../ui/Button'
+import ShareReadyPanel from '../ui/ShareReadyPanel'
 import MenuButton from '../ui/MenuButton'
 
 interface Props {
@@ -19,36 +21,18 @@ export default function ExerciseContextMenu({ exercise, open, onClose }: Props) 
   const navigate = useNavigate()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [affectedWorkouts, setAffectedWorkouts] = useState<string[]>([])
-  const [pendingFile, setPendingFile] = useState<File | null>(null)
-  const [building, setBuilding] = useState(false)
+  const { pendingFile, building, build, share, clear } = usePendingExport(buildExercisesFile)
+
+  function handleClose() {
+    clear()
+    onClose()
+  }
 
   async function handleClone() {
     const cloned: Exercise = { ...exercise, id: uuid(), name: `${exercise.name} (cópia)` }
     await db.exercises.add(cloned)
     onClose()
     navigate(`/exercise/${cloned.id}/edit`)
-  }
-
-  async function handleExport() {
-    setBuilding(true)
-    try {
-      const file = await buildExercisesFile([exercise])
-      setPendingFile(file)
-    } finally {
-      setBuilding(false)
-    }
-  }
-
-  async function handleShare() {
-    if (!pendingFile) return
-    await shareOrDownload(pendingFile)
-    handleClose()
-  }
-
-  function handleClose() {
-    setPendingFile(null)
-    setBuilding(false)
-    onClose()
   }
 
   async function handleDeletePress() {
@@ -84,16 +68,10 @@ export default function ExerciseContextMenu({ exercise, open, onClose }: Props) 
     <>
       <BottomSheet open={open} onClose={handleClose} title={exercise.name}>
         {pendingFile ? (
-          <div className="flex flex-col items-center gap-4 px-4 py-6">
-            <div className="w-12 h-12 rounded-full bg-[#4BDF93]/10 flex items-center justify-center">
-              <Share2 size={22} className="text-[#4BDF93]" />
-            </div>
-            <p className="text-xs text-[#888888]">Arquivo pronto para compartilhar</p>
-            <div className="flex gap-2 w-full pb-2">
-              <Button variant="ghost" fullWidth onClick={handleClose}>Cancelar</Button>
-              <Button fullWidth onClick={handleShare}>Compartilhar</Button>
-            </div>
-          </div>
+          <ShareReadyPanel
+            onShare={async () => { await share(); handleClose() }}
+            onCancel={handleClose}
+          />
         ) : (
           <div className="flex flex-col py-2">
             <MenuButton
@@ -105,7 +83,7 @@ export default function ExerciseContextMenu({ exercise, open, onClose }: Props) 
             <MenuButton onClick={handleClone} icon={<Copy size={16} className="text-[#888888]" />}>
               Clonar exercício
             </MenuButton>
-            <MenuButton onClick={handleExport} icon={<Download size={16} className="text-[#888888]" />} disabled={building}>
+            <MenuButton onClick={() => build([exercise])} icon={<Download size={16} className="text-[#888888]" />} disabled={building}>
               {building ? 'Preparando...' : 'Exportar .treino'}
             </MenuButton>
             <MenuButton onClick={handleDeletePress} icon={<Trash2 size={16} />} variant="danger">

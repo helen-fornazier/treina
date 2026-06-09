@@ -3,14 +3,16 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   ChevronLeft, ChevronDown, ChevronRight, MoreVertical,
-  Play, Pause, Check, RotateCcw, Timer, Copy, Pencil, Trash2, ToggleLeft, ToggleRight, Download, Share2
+  Play, Pause, Check, RotateCcw, Timer, Copy, Pencil, Trash2, ToggleLeft, ToggleRight, Download
 } from 'lucide-react'
 import { db } from '../db'
-import { buildWorkoutsFile, shareOrDownload } from '../utils/export'
+import { buildWorkoutsFile } from '../utils/export'
+import { usePendingExport } from '../hooks/useExport'
 import { cloneWorkout } from '../utils/clone'
 import VideoThumbnail from '../components/ui/VideoThumbnail'
 import BottomSheet from '../components/ui/BottomSheet'
 import Button from '../components/ui/Button'
+import ShareReadyPanel from '../components/ui/ShareReadyPanel'
 import MenuButton from '../components/ui/MenuButton'
 import { uuid } from '../utils/uuid'
 
@@ -25,8 +27,7 @@ export default function WorkoutDetailPage() {
   const [startTime] = useState(() => new Date())
   const [commentOpen, setCommentOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [exportPendingFile, setExportPendingFile] = useState<File | null>(null)
-  const [exportBuilding, setExportBuilding] = useState(false)
+  const exportState = usePendingExport(buildWorkoutsFile)
   const [finishOpen, setFinishOpen] = useState(false)
   const [finishEndTime, setFinishEndTime] = useState<Date | null>(null)
   const [restTimer, setRestTimer] = useState<{ exerciseId: string; seconds: number; running: boolean } | null>(null)
@@ -139,19 +140,7 @@ export default function WorkoutDetailPage() {
 
   async function handleExport() {
     if (!workout) return
-    setExportBuilding(true)
-    try {
-      const file = await buildWorkoutsFile([workout])
-      setExportPendingFile(file)
-    } finally {
-      setExportBuilding(false)
-    }
-  }
-
-  async function handleShare() {
-    if (!exportPendingFile) return
-    await shareOrDownload(exportPendingFile)
-    setExportPendingFile(null)
+    await exportState.build([workout])
   }
 
   if (!workout) return null
@@ -369,8 +358,8 @@ export default function WorkoutDetailPage() {
           >
             Clonar treino
           </MenuButton>
-          <MenuButton onClick={handleExport} icon={<Download size={16} className="text-[#888888]" />} disabled={exportBuilding}>
-            {exportBuilding ? 'Preparando...' : 'Exportar .treino'}
+          <MenuButton onClick={handleExport} icon={<Download size={16} className="text-[#888888]" />} disabled={exportState.building}>
+            {exportState.building ? 'Preparando...' : 'Exportar .treino'}
           </MenuButton>
           <MenuButton
             onClick={() => { setMenuOpen(false); handleDelete() }}
@@ -383,17 +372,11 @@ export default function WorkoutDetailPage() {
       </BottomSheet>
 
       {/* Export share sheet */}
-      <BottomSheet open={!!exportPendingFile} onClose={() => setExportPendingFile(null)} title={workout.name}>
-        <div className="flex flex-col items-center gap-4 px-4 py-6">
-          <div className="w-12 h-12 rounded-full bg-[#4BDF93]/10 flex items-center justify-center">
-            <Share2 size={22} className="text-[#4BDF93]" />
-          </div>
-          <p className="text-xs text-[#888888]">Arquivo pronto para compartilhar</p>
-          <div className="flex gap-2 w-full pb-2">
-            <Button variant="ghost" fullWidth onClick={() => setExportPendingFile(null)}>Cancelar</Button>
-            <Button fullWidth onClick={handleShare}>Compartilhar</Button>
-          </div>
-        </div>
+      <BottomSheet open={!!exportState.pendingFile} onClose={exportState.clear} title={workout.name}>
+        <ShareReadyPanel
+          onShare={async () => { await exportState.share(); exportState.clear() }}
+          onCancel={exportState.clear}
+        />
       </BottomSheet>
 
       {/* Finish Session Sheet */}
